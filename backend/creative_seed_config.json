@@ -1,0 +1,188 @@
+{
+  "clusters": [
+    {
+      "id": "creative_process_ideation",
+      "label": "Creative Process & Ideation",
+      "article_rss_feeds": [
+        "https://longreads.com/feed/",
+        "https://nesslabs.com/feed",
+        "https://99u.adobe.com/feed"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.feedburner.com/99percentinvisible",
+        "https://feeds.npr.org/510298/podcast.xml"
+      ],
+      "youtube_queries": [
+        "creative process documentary",
+        "how artists generate ideas",
+        "creative block deep dive"
+      ],
+      "arxiv_queries": [
+        "creativity cognition",
+        "idea generation psychology",
+        "creative problem solving"
+      ]
+    },
+    {
+      "id": "art_design_history",
+      "label": "Art & Design History",
+      "article_rss_feeds": [
+        "https://www.smithsonianmag.com/rss/arts-culture/",
+        "https://www.artnews.com/feed/",
+        "https://www.thisiscolossal.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.npr.org/381444908/podcast.xml",
+        "https://feeds.npr.org/510289/podcast.xml"
+      ],
+      "youtube_queries": [
+        "history of japanese art",
+        "graphic design history documentary",
+        "bauhaus movement explained"
+      ],
+      "arxiv_queries": [
+        "digital humanities art history",
+        "cultural heritage visualization",
+        "computational art history"
+      ]
+    },
+    {
+      "id": "craft_technique",
+      "label": "Craft & Technique",
+      "article_rss_feeds": [
+        "https://www.premiumbeat.com/blog/feed/",
+        "https://www.provideocoalition.com/feed/",
+        "https://alistapart.com/main/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.simplecast.com/tOjNXec5",
+        "https://feeds.simplecast.com/54nAGcIl"
+      ],
+      "youtube_queries": [
+        "cinematography masterclass full lecture",
+        "writing craft lecture",
+        "music production workflow tutorial long form"
+      ],
+      "arxiv_queries": [
+        "human computer interaction design methods",
+        "creative writing computational methods",
+        "music information retrieval"
+      ]
+    },
+    {
+      "id": "storytelling_narrative",
+      "label": "Storytelling & Narrative",
+      "article_rss_feeds": [
+        "https://lithub.com/feed/",
+        "https://longform.org/feed",
+        "https://electricliterature.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.thisamericanlife.org/talpodcast",
+        "https://feeds.megaphone.fm/GLT1412515089"
+      ],
+      "youtube_queries": [
+        "storytelling lecture documentary",
+        "screenwriting full class",
+        "narrative structure analysis"
+      ],
+      "arxiv_queries": [
+        "narrative generation",
+        "computational storytelling",
+        "story understanding models"
+      ]
+    },
+    {
+      "id": "aesthetics_visual_culture",
+      "label": "Aesthetics & Visual Culture",
+      "article_rss_feeds": [
+        "https://aeon.co/feed.rss",
+        "https://www.designboom.com/feed/",
+        "https://www.dezeen.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.feedburner.com/99percentinvisible",
+        "https://feeds.simplecast.com/tOjNXec5"
+      ],
+      "youtube_queries": [
+        "visual culture lecture",
+        "aesthetics in film analysis",
+        "typography documentary full"
+      ],
+      "arxiv_queries": [
+        "computational aesthetics",
+        "visual perception design",
+        "image aesthetics assessment"
+      ]
+    },
+    {
+      "id": "tools_workflows",
+      "label": "Tools & Workflows",
+      "article_rss_feeds": [
+        "https://www.smashingmagazine.com/feed/",
+        "https://uxdesign.cc/feed",
+        "https://www.creativebloq.com/feeds/all"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.simplecast.com/54nAGcIl",
+        "https://feeds.npr.org/510289/podcast.xml"
+      ],
+      "youtube_queries": [
+        "design workflow deep dive",
+        "creative pipeline case study",
+        "ai tools for creators long form"
+      ],
+      "arxiv_queries": [
+        "human ai collaboration creativity",
+        "design support systems",
+        "creative tools evaluation"
+      ]
+    },
+    {
+      "id": "creative_career_business",
+      "label": "Creative Career & Business",
+      "article_rss_feeds": [
+        "https://www.itsnicethat.com/rss",
+        "https://seths.blog/feed/",
+        "https://www.fastcompany.com/section/innovation/rss"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.npr.org/381444908/podcast.xml",
+        "https://feeds.npr.org/510298/podcast.xml"
+      ],
+      "youtube_queries": [
+        "creative career advice talk",
+        "freelance design business strategy",
+        "portfolio review long form"
+      ],
+      "arxiv_queries": [
+        "creative industries economics",
+        "entrepreneurship in creative sectors",
+        "platform economy creators"
+      ]
+    },
+    {
+      "id": "creativity_mindset_psychology",
+      "label": "Creativity, Mindset & Psychology",
+      "article_rss_feeds": [
+        "https://nautil.us/feed",
+        "https://www.themarginalian.org/feed/",
+        "https://longreads.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.thisamericanlife.org/talpodcast",
+        "https://feeds.npr.org/381444908/podcast.xml"
+      ],
+      "youtube_queries": [
+        "psychology of creativity lecture",
+        "attention and focus deep dive",
+        "burnout and creative work documentary"
+      ],
+      "arxiv_queries": [
+        "creative cognition neuroscience",
+        "motivation and creative performance",
+        "attention and productivity psychology"
+      ]
+    }
+  ]
+}

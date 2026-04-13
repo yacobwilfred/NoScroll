@@ -1,0 +1,358 @@
+{
+  "clusters": [
+    {
+      "id": "mind_perception_consciousness",
+      "label": "Mind, Perception & Consciousness",
+      "article_rss_feeds": [
+        "https://nautil.us/feed",
+        "https://www.themarginalian.org/feed/",
+        "https://aeon.co/feed.rss"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.npr.org/510308/podcast.xml",
+        "https://feeds.wnyc.org/radiolab",
+        "https://feeds.npr.org/510307/podcast.xml"
+      ],
+      "youtube_queries": [
+        "consciousness neuroscience lecture documentary",
+        "philosophy of mind explained",
+        "perception and the brain full lecture"
+      ],
+      "arxiv_queries": [
+        "consciousness neuroscience cognitive science",
+        "perception multisensory integration psychology",
+        "memory consolidation emotion neuroscience"
+      ]
+    },
+    {
+      "id": "philosophy_ethics",
+      "label": "Philosophy & Ethics",
+      "article_rss_feeds": [
+        "https://aeon.co/feed.rss",
+        "https://www.themarginalian.org/feed/",
+        "https://philosophynow.org/rss/news"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.feedburner.com/philosophizethis",
+        "https://feeds.feedburner.com/partiallyexaminedlife",
+        "https://feeds.npr.org/510308/podcast.xml"
+      ],
+      "youtube_queries": [
+        "western philosophy history lecture series",
+        "eastern philosophy Buddhism Taoism documentary",
+        "ethics thought experiment moral philosophy"
+      ],
+      "arxiv_queries": [
+        "moral philosophy ethics experimental",
+        "eastern philosophy comparative religion cognitive",
+        "consciousness philosophy free will"
+      ]
+    },
+    {
+      "id": "art_history_movements",
+      "label": "Art History & Movements",
+      "article_rss_feeds": [
+        "https://www.artnews.com/feed/",
+        "https://hyperallergic.com/feed/",
+        "https://www.thisiscolossal.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.npr.org/381444908/podcast.xml",
+        "https://feeds.feedburner.com/99percentinvisible"
+      ],
+      "youtube_queries": [
+        "art history documentary full film",
+        "impressionism modernism movement explained deep dive",
+        "famous artists biography documentary"
+      ],
+      "arxiv_queries": [
+        "computational art history digital humanities",
+        "art movement style classification neural network",
+        "cultural heritage visual analysis"
+      ]
+    },
+    {
+      "id": "visual_arts_practice",
+      "label": "Visual Arts Practice",
+      "article_rss_feeds": [
+        "https://hyperallergic.com/feed/",
+        "https://www.thisiscolossal.com/feed/",
+        "https://www.artnews.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.npr.org/381444908/podcast.xml",
+        "https://feeds.feedburner.com/99percentinvisible"
+      ],
+      "youtube_queries": [
+        "painting technique masterclass documentary",
+        "photography history and practice full lecture",
+        "sculpture ceramics artist studio process"
+      ],
+      "arxiv_queries": [
+        "artistic style generation deep learning",
+        "photography visual aesthetics computational",
+        "sculptural form generative design"
+      ]
+    },
+    {
+      "id": "design_craft_making",
+      "label": "Design, Craft & Making",
+      "article_rss_feeds": [
+        "https://eyeondesign.aiga.org/feed/",
+        "https://www.designboom.com/feed/",
+        "https://www.itsnicethat.com/rss"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.simplecast.com/dY9C8p8F",
+        "https://feeds.feedburner.com/99percentinvisible"
+      ],
+      "youtube_queries": [
+        "graphic design history movement documentary",
+        "craft making process artisan long form",
+        "typography calligraphy letterpress history"
+      ],
+      "arxiv_queries": [
+        "graphic design computational layout generation",
+        "craft skill learning human computer interaction",
+        "textile pattern design generative"
+      ]
+    },
+    {
+      "id": "fashion_costume_history",
+      "label": "Fashion, Costume & Textiles",
+      "article_rss_feeds": [
+        "https://www.dezeen.com/feed/",
+        "https://hyperallergic.com/feed/",
+        "https://www.thisiscolossal.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.acast.com/public/shows/dressed-the-history-of-fashion",
+        "https://feeds.npr.org/381444908/podcast.xml"
+      ],
+      "youtube_queries": [
+        "fashion history documentary century",
+        "costume design film explained",
+        "textile tradition craft documentary"
+      ],
+      "arxiv_queries": [
+        "fashion design computational recommendation",
+        "clothing historical cultural analysis",
+        "textile visual recognition deep learning"
+      ]
+    },
+    {
+      "id": "society_culture_anthropology",
+      "label": "Society, Culture & Anthropology",
+      "article_rss_feeds": [
+        "https://theconversation.com/global/feed",
+        "https://aeon.co/feed.rss",
+        "https://nautil.us/feed"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.npr.org/510308/podcast.xml",
+        "https://feeds.megaphone.fm/GLT1412515089",
+        "https://feeds.wnyc.org/onthemedia"
+      ],
+      "youtube_queries": [
+        "social psychology experiment documentary",
+        "anthropology fieldwork culture documentary",
+        "mass media popular culture analysis lecture"
+      ],
+      "arxiv_queries": [
+        "social behavior computational modeling cultural evolution",
+        "anthropology ethnography digital methods",
+        "media effects social science folk culture"
+      ]
+    },
+    {
+      "id": "identity_gender_society",
+      "label": "Identity, Gender & Society",
+      "article_rss_feeds": [
+        "https://longreads.com/feed/",
+        "https://aeon.co/feed.rss",
+        "https://theconversation.com/global/feed"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.npr.org/510312/podcast.xml",
+        "https://feeds.npr.org/510307/podcast.xml",
+        "https://feeds.npr.org/510308/podcast.xml"
+      ],
+      "youtube_queries": [
+        "disability rights history documentary",
+        "gender studies feminism lecture",
+        "queer history identity documentary"
+      ],
+      "arxiv_queries": [
+        "gender identity social psychology",
+        "disability neurodiversity inclusion research",
+        "race ethnicity social inequality computational"
+      ]
+    },
+    {
+      "id": "space_nature_science",
+      "label": "Space, Nature & Science",
+      "article_rss_feeds": [
+        "https://www.quantamagazine.org/feed/",
+        "https://nautil.us/feed",
+        "https://www.thisiscolossal.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.wnyc.org/radiolab",
+        "https://feeds.npr.org/510221/podcast.xml",
+        "https://feeds.npr.org/510298/podcast.xml"
+      ],
+      "youtube_queries": [
+        "space exploration cosmology documentary",
+        "biology ecology nature documentary",
+        "materials science medicine history lecture"
+      ],
+      "arxiv_queries": [
+        "astrophysics cosmology multiverse",
+        "evolutionary biology ecology computational",
+        "materials science machine learning discovery"
+      ]
+    },
+    {
+      "id": "urban_architecture",
+      "label": "Architecture & Urban Design",
+      "article_rss_feeds": [
+        "https://www.dezeen.com/feed/",
+        "https://www.archdaily.com/feed",
+        "https://www.designboom.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.feedburner.com/99percentinvisible",
+        "https://feeds.wnyc.org/onthemedia"
+      ],
+      "youtube_queries": [
+        "architecture history masterpiece documentary",
+        "urban design city planning future",
+        "interior design landscape architecture process"
+      ],
+      "arxiv_queries": [
+        "urban planning computational design",
+        "architecture space layout optimization",
+        "landscape urbanism ecology design"
+      ]
+    },
+    {
+      "id": "social_change_protest",
+      "label": "Social Change, Protest & Conflict",
+      "article_rss_feeds": [
+        "https://longreads.com/feed/",
+        "https://aeon.co/feed.rss",
+        "https://theconversation.com/global/feed"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.wnyc.org/onthemedia",
+        "https://feeds.npr.org/510312/podcast.xml",
+        "https://feeds.thisamericanlife.org/talpodcast"
+      ],
+      "youtube_queries": [
+        "social movement history documentary",
+        "protest art activism documentary",
+        "civil rights history political conflict lecture"
+      ],
+      "arxiv_queries": [
+        "social movement theory collective action",
+        "conflict resolution political science",
+        "protest social media computational analysis"
+      ]
+    },
+    {
+      "id": "religion_mythology",
+      "label": "Religion, Mythology & Folklore",
+      "article_rss_feeds": [
+        "https://aeon.co/feed.rss",
+        "https://www.themarginalian.org/feed/",
+        "https://nautil.us/feed"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.wnyc.org/radiolab",
+        "https://feeds.thisamericanlife.org/talpodcast",
+        "https://feeds.feedburner.com/philosophizethis"
+      ],
+      "youtube_queries": [
+        "world mythology documentary explained",
+        "comparative religion history lecture",
+        "folklore oral tradition cultural documentary"
+      ],
+      "arxiv_queries": [
+        "mythology cognitive science cultural evolution",
+        "religious studies digital humanities text",
+        "folklore narrative structure computational"
+      ]
+    },
+    {
+      "id": "food_culture",
+      "label": "Food, Culture & Ritual",
+      "article_rss_feeds": [
+        "https://www.seriouseats.com/atom.xml",
+        "https://longreads.com/feed/",
+        "https://theconversation.com/global/feed"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.splendidtable.org/splendidtable",
+        "https://gastropod.com/feed/podcast/",
+        "https://feeds.thisamericanlife.org/talpodcast"
+      ],
+      "youtube_queries": [
+        "food history culture documentary",
+        "culinary tradition ritual anthropology",
+        "chef process fermentation food science documentary"
+      ],
+      "arxiv_queries": [
+        "food culture social anthropology",
+        "culinary history cultural identity",
+        "nutrition food behavior social science"
+      ]
+    },
+    {
+      "id": "marketing_media_branding",
+      "label": "Marketing, Media & Branding",
+      "article_rss_feeds": [
+        "https://seths.blog/feed/",
+        "https://www.fastcompany.com/section/innovation/rss",
+        "https://www.itsnicethat.com/rss"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.wnyc.org/onthemedia",
+        "https://feeds.npr.org/510313/podcast.xml",
+        "https://feeds.megaphone.fm/GLT1412515089"
+      ],
+      "youtube_queries": [
+        "brand identity design history documentary",
+        "advertising psychology marketing deep dive",
+        "printing history typography press documentary"
+      ],
+      "arxiv_queries": [
+        "brand perception consumer behavior psychology",
+        "advertising effectiveness media influence",
+        "visual identity design computational"
+      ]
+    },
+    {
+      "id": "comics_graphic_fiction",
+      "label": "Comics, Graphic Novels & Sequential Art",
+      "article_rss_feeds": [
+        "https://hyperallergic.com/feed/",
+        "https://www.thisiscolossal.com/feed/",
+        "https://comicsbeat.com/feed/"
+      ],
+      "podcast_rss_feeds": [
+        "https://feeds.npr.org/381444908/podcast.xml",
+        "https://feeds.thisamericanlife.org/talpodcast"
+      ],
+      "youtube_queries": [
+        "comics art history documentary",
+        "graphic novel visual narrative analysis",
+        "manga animation history documentary"
+      ],
+      "arxiv_queries": [
+        "comics sequential art visual narrative analysis",
+        "graphic novel text image multimodal",
+        "comic panel layout understanding"
+      ]
+    }
+  ]
+}

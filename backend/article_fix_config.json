@@ -1,0 +1,126 @@
+{
+  "_note": "Targeted article fix-up pass for clusters with zero or very few articles.",
+  "clusters": [
+    {
+      "id": "religion_mythology",
+      "label": "Religion, Mythology & Folklore",
+      "article_rss_feeds": [
+        "https://publicdomainreview.org/feed/",
+        "https://daily.jstor.org/feed/",
+        "https://www.worldhistory.org/rss/",
+        "https://www.openculture.com/?feed=rss2",
+        "https://theconversation.com/articles.atom"
+      ]
+    },
+    {
+      "id": "social_change_protest",
+      "label": "Social Change, Protest & Conflict",
+      "article_rss_feeds": [
+        "https://theconversation.com/articles.atom",
+        "https://daily.jstor.org/feed/",
+        "https://longreads.com/feed/",
+        "https://www.openculture.com/?feed=rss2"
+      ]
+    },
+    {
+      "id": "philosophy_ethics",
+      "label": "Philosophy & Ethics",
+      "article_rss_feeds": [
+        "https://publicdomainreview.org/feed/",
+        "https://theconversation.com/articles.atom",
+        "https://aeon.co/feed.rss",
+        "https://daily.jstor.org/feed/",
+        "https://www.openculture.com/?feed=rss2"
+      ]
+    },
+    {
+      "id": "society_culture_anthropology",
+      "label": "Society, Culture & Anthropology",
+      "article_rss_feeds": [
+        "https://theconversation.com/articles.atom",
+        "https://daily.jstor.org/feed/",
+        "https://aeon.co/feed.rss",
+        "https://nautil.us/feed",
+        "https://www.openculture.com/?feed=rss2"
+      ]
+    },
+    {
+      "id": "identity_gender_society",
+      "label": "Identity, Gender & Society",
+      "article_rss_feeds": [
+        "https://theconversation.com/articles.atom",
+        "https://longreads.com/feed/",
+        "https://daily.jstor.org/feed/"
+      ]
+    },
+    {
+      "id": "space_nature_science",
+      "label": "Space, Nature & Science",
+      "article_rss_feeds": [
+        "https://www.quantamagazine.org/feed/",
+        "https://theconversation.com/articles.atom",
+        "https://daily.jstor.org/feed/",
+        "https://nautil.us/feed"
+      ]
+    },
+    {
+      "id": "food_culture",
+      "label": "Food, Culture & Ritual",
+      "article_rss_feeds": [
+        "https://eater.com/rss/index.xml",
+        "https://theconversation.com/articles.atom",
+        "https://daily.jstor.org/feed/",
+        "https://longreads.com/feed/"
+      ]
+    },
+    {
+      "id": "art_history_movements",
+      "label": "Art History & Movements",
+      "article_rss_feeds": [
+        "https://publicdomainreview.org/feed/",
+        "https://www.worldhistory.org/rss/",
+        "https://daily.jstor.org/feed/",
+        "https://theconversation.com/articles.atom"
+      ]
+    },
+    {
+      "id": "mind_perception_consciousness",
+      "label": "Mind, Perception & Consciousness",
+      "article_rss_feeds": [
+        "https://theconversation.com/articles.atom",
+        "https://daily.jstor.org/feed/",
+        "https://nautil.us/feed",
+        "https://www.quantamagazine.org/feed/"
+      ]
+    },
+    {
+      "id": "creativity_mindset_psychology",
+      "label": "Creativity, Mindset & Psychology",
+      "article_rss_feeds": [
+        "https://theconversation.com/articles.atom",
+        "https://daily.jstor.org/feed/",
+        "https://aeon.co/feed.rss",
+        "https://www.themarginalian.org/feed/"
+      ]
+    },
+    {
+      "id": "urban_architecture",
+      "label": "Architecture & Urban Design",
+      "article_rss_feeds": [
+        "https://theconversation.com/articles.atom",
+        "https://daily.jstor.org/feed/",
+        "https://www.archdaily.com/feed",
+        "https://www.niemanlab.org/feed/"
+      ]
+    },
+    {
+      "id": "marketing_media_branding",
+      "label": "Marketing, Media & Branding",
+      "article_rss_feeds": [
+        "https://www.niemanlab.org/feed/",
+        "https://theconversation.com/articles.atom",
+        "https://daily.jstor.org/feed/"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,239 @@
+{
+  "_note": "Article-only ingestion pass. No youtube_queries or arxiv_queries so TYPE_WEIGHTS routes everything to articles.",
+  "clusters": [
+    {
+      "id": "mind_perception_consciousness",
+      "label": "Mind, Perception & Consciousness",
+      "article_rss_feeds": [
+        "https://www.quantamagazine.org/feed/",
+        "https://greatergood.berkeley.edu/feeds/articles",
+        "https://theconversation.com/global/feed",
+        "https://daily.jstor.org/feed/",
+        "https://nesslabs.com/feed"
+      ]
+    },
+    {
+      "id": "philosophy_ethics",
+      "label": "Philosophy & Ethics",
+      "article_rss_feeds": [
+        "https://philosophynow.org/rss/news",
+        "https://www.3quarksdaily.com/3quarksdaily/rss.xml",
+        "https://aeon.co/feed.rss",
+        "https://daily.jstor.org/feed/",
+        "https://theconversation.com/global/feed"
+      ]
+    },
+    {
+      "id": "art_history_movements",
+      "label": "Art History & Movements",
+      "article_rss_feeds": [
+        "https://publicdomainreview.org/feed.xml",
+        "https://daily.jstor.org/feed/",
+        "https://hyperallergic.com/feed/",
+        "https://www.historytoday.com/history-today.rss",
+        "https://www.artsy.net/rss/news"
+      ]
+    },
+    {
+      "id": "visual_arts_practice",
+      "label": "Visual Arts Practice",
+      "article_rss_feeds": [
+        "https://hyperallergic.com/feed/",
+        "https://aestheticamagazine.com/feed/",
+        "https://www.thisiscolossal.com/feed/",
+        "https://www.artnews.com/feed/",
+        "https://www.artsy.net/rss/news"
+      ]
+    },
+    {
+      "id": "design_craft_making",
+      "label": "Design, Craft & Making",
+      "article_rss_feeds": [
+        "https://eyeondesign.aiga.org/feed/",
+        "https://designobserver.com/rss.xml",
+        "https://printmag.com/rss.xml",
+        "https://www.itsnicethat.com/rss",
+        "https://www.creativebloq.com/feeds/all"
+      ]
+    },
+    {
+      "id": "fashion_costume_history",
+      "label": "Fashion, Costume & Textiles",
+      "article_rss_feeds": [
+        "https://fashionista.com/rss.xml",
+        "https://daily.jstor.org/feed/",
+        "https://publicdomainreview.org/feed.xml",
+        "https://www.dezeen.com/fashion/feed/",
+        "https://hyperallergic.com/feed/"
+      ]
+    },
+    {
+      "id": "society_culture_anthropology",
+      "label": "Society, Culture & Anthropology",
+      "article_rss_feeds": [
+        "https://theconversation.com/global/feed",
+        "https://daily.jstor.org/feed/",
+        "https://aeon.co/feed.rss",
+        "https://www.3quarksdaily.com/3quarksdaily/rss.xml",
+        "https://nautil.us/feed"
+      ]
+    },
+    {
+      "id": "identity_gender_society",
+      "label": "Identity, Gender & Society",
+      "article_rss_feeds": [
+        "https://theconversation.com/global/feed",
+        "https://longreads.com/feed/",
+        "https://yesmagazine.org/rss.xml",
+        "https://bitchmedia.org/feed",
+        "https://daily.jstor.org/feed/"
+      ]
+    },
+    {
+      "id": "space_nature_science",
+      "label": "Space, Nature & Science",
+      "article_rss_feeds": [
+        "https://www.quantamagazine.org/feed/",
+        "https://nautil.us/feed",
+        "https://theconversation.com/global/feed",
+        "https://www.sciencenews.org/feed",
+        "https://daily.jstor.org/feed/"
+      ]
+    },
+    {
+      "id": "urban_architecture",
+      "label": "Architecture & Urban Design",
+      "article_rss_feeds": [
+        "https://placesjournal.org/feed/",
+        "https://www.metropolismag.com/feed/",
+        "https://www.archdaily.com/feed",
+        "https://www.dezeen.com/architecture/feed/",
+        "https://theconversation.com/global/feed"
+      ]
+    },
+    {
+      "id": "social_change_protest",
+      "label": "Social Change, Protest & Conflict",
+      "article_rss_feeds": [
+        "https://longreads.com/feed/",
+        "https://yesmagazine.org/rss.xml",
+        "https://theconversation.com/global/feed",
+        "https://daily.jstor.org/feed/",
+        "https://www.3quarksdaily.com/3quarksdaily/rss.xml"
+      ]
+    },
+    {
+      "id": "religion_mythology",
+      "label": "Religion, Mythology & Folklore",
+      "article_rss_feeds": [
+        "https://publicdomainreview.org/feed.xml",
+        "https://aeon.co/feed.rss",
+        "https://daily.jstor.org/feed/",
+        "https://theconversation.com/global/feed",
+        "https://www.historytoday.com/history-today.rss"
+      ]
+    },
+    {
+      "id": "food_culture",
+      "label": "Food, Culture & Ritual",
+      "article_rss_feeds": [
+        "https://www.seriouseats.com/atom.xml",
+        "https://eater.com/rss/index.xml",
+        "https://daily.jstor.org/feed/",
+        "https://theconversation.com/global/feed",
+        "https://longreads.com/feed/"
+      ]
+    },
+    {
+      "id": "marketing_media_branding",
+      "label": "Marketing, Media & Branding",
+      "article_rss_feeds": [
+        "https://www.niemanlab.org/feed/",
+        "https://www.marketingweek.com/feed/",
+        "https://seths.blog/feed/",
+        "https://theconversation.com/global/feed",
+        "https://www.3quarksdaily.com/3quarksdaily/rss.xml"
+      ]
+    },
+    {
+      "id": "comics_graphic_fiction",
+      "label": "Comics, Graphic Novels & Sequential Art",
+      "article_rss_feeds": [
+        "https://hyperallergic.com/feed/",
+        "https://comicsbeat.com/feed/",
+        "https://tcj.com/feed/",
+        "https://www.thisiscolossal.com/feed/"
+      ]
+    },
+    {
+      "id": "creative_process_ideation",
+      "label": "Creative Process & Ideation",
+      "article_rss_feeds": [
+        "https://99u.adobe.com/feed",
+        "https://nesslabs.com/feed",
+        "https://www.themarginalian.org/feed/",
+        "https://longreads.com/feed/"
+      ]
+    },
+    {
+      "id": "creativity_mindset_psychology",
+      "label": "Creativity, Mindset & Psychology",
+      "article_rss_feeds": [
+        "https://greatergood.berkeley.edu/feeds/articles",
+        "https://nautil.us/feed",
+        "https://aeon.co/feed.rss",
+        "https://www.themarginalian.org/feed/"
+      ]
+    },
+    {
+      "id": "art_design_history",
+      "label": "Art & Design History",
+      "article_rss_feeds": [
+        "https://publicdomainreview.org/feed.xml",
+        "https://hyperallergic.com/feed/",
+        "https://www.smithsonianmag.com/rss/arts-culture/",
+        "https://www.historytoday.com/history-today.rss"
+      ]
+    },
+    {
+      "id": "aesthetics_visual_culture",
+      "label": "Aesthetics & Visual Culture",
+      "article_rss_feeds": [
+        "https://aestheticamagazine.com/feed/",
+        "https://designobserver.com/rss.xml",
+        "https://publicdomainreview.org/feed.xml",
+        "https://aeon.co/feed.rss"
+      ]
+    },
+    {
+      "id": "storytelling_narrative",
+      "label": "Storytelling & Narrative",
+      "article_rss_feeds": [
+        "https://electricliterature.com/feed/",
+        "https://lithub.com/feed/",
+        "https://longreads.com/feed/",
+        "https://www.themarginalian.org/feed/"
+      ]
+    },
+    {
+      "id": "craft_technique",
+      "label": "Craft & Technique",
+      "article_rss_feeds": [
+        "https://eyeondesign.aiga.org/feed/",
+        "https://designobserver.com/rss.xml",
+        "https://hyperallergic.com/feed/",
+        "https://printmag.com/rss.xml"
+      ]
+    },
+    {
+      "id": "tools_workflows",
+      "label": "Tools & Workflows",
+      "article_rss_feeds": [
+        "https://smashingmagazine.com/feed/",
+        "https://alistapart.com/main/feed/",
+        "https://uxdesign.cc/feed",
+        "https://www.niemanlab.org/feed/"
+      ]
+    }
+  ]
+}

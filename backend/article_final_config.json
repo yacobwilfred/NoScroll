@@ -1,0 +1,123 @@
+{
+  "_note": "Final targeted pass using topic-specific feeds for underserved clusters.",
+  "clusters": [
+    {
+      "id": "philosophy_ethics",
+      "label": "Philosophy & Ethics",
+      "article_rss_feeds": [
+        "https://3quarksdaily.com/feed",
+        "https://www.zocalopublicsquare.org/feed/",
+        "https://www.plough.com/en/feed.rss",
+        "https://daily.jstor.org/feed/"
+      ]
+    },
+    {
+      "id": "society_culture_anthropology",
+      "label": "Society, Culture & Anthropology",
+      "article_rss_feeds": [
+        "https://www.sapiens.org/feed/",
+        "https://3quarksdaily.com/feed",
+        "https://popula.com/feed/",
+        "https://reallifemag.com/feed/"
+      ]
+    },
+    {
+      "id": "identity_gender_society",
+      "label": "Identity, Gender & Society",
+      "article_rss_feeds": [
+        "https://popula.com/feed/",
+        "https://longreads.com/feed/",
+        "https://reallifemag.com/feed/",
+        "https://www.zocalopublicsquare.org/feed/"
+      ]
+    },
+    {
+      "id": "food_culture",
+      "label": "Food, Culture & Ritual",
+      "article_rss_feeds": [
+        "https://gastronomica.org/feed/",
+        "https://eater.com/rss/index.xml",
+        "https://longreads.com/feed/"
+      ]
+    },
+    {
+      "id": "religion_mythology",
+      "label": "Religion, Mythology & Folklore",
+      "article_rss_feeds": [
+        "https://www.plough.com/en/feed.rss",
+        "https://dark-mountain.net/feed/",
+        "https://publicdomainreview.org/feed/",
+        "https://3quarksdaily.com/feed"
+      ]
+    },
+    {
+      "id": "social_change_protest",
+      "label": "Social Change, Protest & Conflict",
+      "article_rss_feeds": [
+        "https://longreads.com/feed/",
+        "https://popula.com/feed/",
+        "https://www.zocalopublicsquare.org/feed/",
+        "https://reallifemag.com/feed/"
+      ]
+    },
+    {
+      "id": "space_nature_science",
+      "label": "Space, Nature & Science",
+      "article_rss_feeds": [
+        "https://orionmagazine.org/feed/",
+        "https://emergencemagazine.org/feed/",
+        "https://dark-mountain.net/feed/",
+        "https://www.quantamagazine.org/feed/"
+      ]
+    },
+    {
+      "id": "storytelling_narrative",
+      "label": "Storytelling & Narrative",
+      "article_rss_feeds": [
+        "https://thebeliever.net/feed/",
+        "https://www.laphamsquarterly.org/rss.xml",
+        "https://lithub.com/feed/",
+        "https://electricliterature.com/feed/"
+      ]
+    },
+    {
+      "id": "creativity_mindset_psychology",
+      "label": "Creativity, Mindset & Psychology",
+      "article_rss_feeds": [
+        "https://www.zocalopublicsquare.org/feed/",
+        "https://3quarksdaily.com/feed",
+        "https://nesslabs.com/feed",
+        "https://www.themarginalian.org/feed/"
+      ]
+    },
+    {
+      "id": "art_design_history",
+      "label": "Art & Design History",
+      "article_rss_feeds": [
+        "https://publicdomainreview.org/feed/",
+        "https://www.laphamsquarterly.org/rss.xml",
+        "https://hyperallergic.com/feed/",
+        "https://3quarksdaily.com/feed"
+      ]
+    },
+    {
+      "id": "visual_arts_practice",
+      "label": "Visual Arts Practice",
+      "article_rss_feeds": [
+        "https://thebeliever.net/feed/",
+        "https://hyperallergic.com/feed/",
+        "https://www.thisiscolossal.com/feed/"
+      ]
+    },
+    {
+      "id": "mind_perception_consciousness",
+      "label": "Mind, Perception & Consciousness",
+      "article_rss_feeds": [
+        "https://3quarksdaily.com/feed",
+        "https://reallifemag.com/feed/",
+        "https://www.quantamagazine.org/feed/",
+        "https://nautil.us/feed"
+      ]
+    }
+  ]
+}
