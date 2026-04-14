@@ -10,6 +10,7 @@ Direction strategy:
   shares topical overlap with what the user is currently viewing.
 """
 
+import os
 import random
 import uuid
 from typing import Dict, List, Optional, Tuple
@@ -23,6 +24,8 @@ _embed_model = None
 
 def _get_embed_model():
     global _embed_model
+    if os.environ.get("DISABLE_EMBEDDINGS", "").lower() in ("1", "true", "yes"):
+        return None
     if _embed_model is None:
         try:
             from sentence_transformers import SentenceTransformer
