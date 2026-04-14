@@ -1,5 +1,6 @@
+# Railway sets PORT; official nginx image runs envsubst on /etc/nginx/templates/*.template
 server {
-    listen 80;
+    listen ${PORT};
     server_name _;
     root /usr/share/nginx/html;
     index index.html;

@@ -1,5 +1,7 @@
 # Deploying NoScroll on Railway
 
+**Step-by-step UI walkthrough:** see **`DEPLOY_RAILWAY_STEPS.md`** in this repo.
+
 Two services: **API** (Python/FastAPI) and **Frontend** (static Vite build behind nginx).
 
 ## Shared demo identity (forced for all visitors)

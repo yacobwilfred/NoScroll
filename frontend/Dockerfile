@@ -18,7 +18,8 @@ ENV VITE_DEMO_USER_TOKEN=$VITE_DEMO_USER_TOKEN
 RUN npm run build
 
 FROM nginx:alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Railway injects PORT; entrypoint substitutes into template → conf.d
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
+ENV PORT=80
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
