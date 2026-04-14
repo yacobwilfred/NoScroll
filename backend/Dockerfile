@@ -3,9 +3,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# lxml (newspaper3k) + building wheels
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libxml2-dev libxslt1-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# CPU-only PyTorch first (smaller, more reliable on Railway builders than default CUDA pull)
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

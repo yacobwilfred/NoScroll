@@ -73,6 +73,19 @@ You need **one login**: a **Railway** account linked to **GitHub** (same account
 
 ## If something fails
 
+### Build failed (red error on the service card)
+
+1. Click the **NoScroll** service → **Deployments** → the failed deployment → **Build logs** (or **View logs**).
+2. Scroll to the **last red / error lines** — that is the real reason (missing package, OOM, wrong root directory, etc.).
+3. **Root directory** for the API service must be **`backend`** so Railway finds `backend/Dockerfile` and `requirements.txt`. If it’s empty or `.`, the build will fail.
+
+Common fixes:
+
+- **Out of memory / killed** during `pip install` or torch: in Railway → service → **Settings** → increase **memory** for the build, or use a paid plan with a larger builder; then **Redeploy**.
+- After we updated the repo Dockerfile (CPU PyTorch + XML libs), **push to GitHub** and trigger **Redeploy** so Railway rebuilds from the latest commit.
+
+### Runtime issues
+
 | Symptom | What to check |
 |--------|----------------|
 | Frontend **502** / **Application failed** | Frontend logs; nginx must listen on `$PORT` (this repo uses `nginx.conf.template`). |
