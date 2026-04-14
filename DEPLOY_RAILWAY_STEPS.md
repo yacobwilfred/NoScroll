@@ -16,9 +16,10 @@ You need **one login**: a **Railway** account linked to **GitHub** (same account
 
 1. **New Project** → **Deploy from GitHub repo**.
 2. Select **`NoScroll`** (or `yacobwilfred/NoScroll`).
-3. Railway may create one service — click it and open **Settings**:
-   - **Root Directory** → set to **`backend`** (important).
-   - **Builder** → **Dockerfile** (path `Dockerfile` inside `backend`).
+3. Railway may default to **Railpack** — the repo includes **`railway.toml`** to force **`DOCKERFILE`** builds. If you still see Railpack errors, open **Settings → Build** and set **Builder** to **Dockerfile** manually.
+4. Open **Settings** for the API service:
+   - **Root Directory** → **`.`** or leave **empty** (repo root). This uses the root **`Dockerfile`** (API).
+   - Do **not** leave Railpack as the builder for this monorepo.
 4. Open the **Variables** tab and add:
 
    | Name | Value |
@@ -77,12 +78,16 @@ You need **one login**: a **Railway** account linked to **GitHub** (same account
 
 1. Click the **NoScroll** service → **Deployments** → the failed deployment → **Build logs** (or **View logs**).
 2. Scroll to the **last red / error lines** — that is the real reason (missing package, OOM, wrong root directory, etc.).
-3. **Root directory** for the API service must be **`backend`** so Railway finds `backend/Dockerfile` and `requirements.txt`. If it’s empty or `.`, the build will fail.
+
+**If logs say `Railpack` / “could not determine how to build”:** Railway used auto-detect instead of Docker. The repo includes **`railway.toml`** to force **Dockerfile** builds — **push the latest commit**, then **Redeploy**. Or set **Settings → Build → Builder → Dockerfile** and **Dockerfile path** = `Dockerfile` (see [Railway Dockerfiles](https://docs.railway.com/builds/dockerfiles)).
+
+**API service:** **Root Directory** = **`.`** (repo root) so it uses the root **`Dockerfile`**.  
+**Frontend service (later):** **Root Directory** = **`frontend`** so it uses **`frontend/Dockerfile`**.
 
 Common fixes:
 
 - **Out of memory / killed** during `pip install` or torch: in Railway → service → **Settings** → increase **memory** for the build, or use a paid plan with a larger builder; then **Redeploy**.
-- After we updated the repo Dockerfile (CPU PyTorch + XML libs), **push to GitHub** and trigger **Redeploy** so Railway rebuilds from the latest commit.
+- After Dockerfile / `railway.toml` updates, **push to GitHub** and **Redeploy**.
 
 ### Runtime issues
 

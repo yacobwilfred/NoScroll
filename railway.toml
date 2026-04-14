@@ -1,0 +1,6 @@
+# Force Docker builds (not Railpack). Each Railway service sets its own Root Directory:
+# - API:  "."  → uses repo-root Dockerfile
+# - Web:  "frontend" → uses frontend/Dockerfile
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
