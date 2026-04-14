@@ -1,4 +1,6 @@
 import os
+import sqlite3
+import subprocess
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -51,11 +53,45 @@ app = FastAPI(
     version="0.1.0",
 )
 
+def _ensure_content_corpus_loaded() -> None:
+    """
+    On fresh/ephemeral deploys, load bundled metadata into SQLite so
+    prompt exploration has content immediately.
+    Safe to call repeatedly: only loads when contents is empty.
+    """
+    con = sqlite3.connect(db.DB_PATH)
+    try:
+        row = con.execute("SELECT COUNT(*) FROM contents").fetchone()
+        contents_count = row[0] if row else 0
+    finally:
+        con.close()
+    if contents_count > 0:
+        return
+
+    seed_input = os.environ.get("CONTENT_SEED_FILE", "/app/creative_content_metadata.json")
+    if not os.path.exists(seed_input):
+        print(f"[startup] seed file not found: {seed_input}")
+        return
+
+    print(f"[startup] contents empty; loading seed corpus from {seed_input}")
+    subprocess.run(
+        [
+            "python",
+            "/app/load_to_db.py",
+            "--input",
+            seed_input,
+            "--db",
+            str(db.DB_PATH),
+        ],
+        check=False,
+    )
+
 
 @app.on_event("startup")
 def startup_event():
     db.ensure_content_schema()
     db.ensure_embeddings_table()
+    _ensure_content_corpus_loaded()
     db.ensure_fts_index()
     profile_router.ensure_profile_schema()
     identity_router.ensure_identity_schema()
