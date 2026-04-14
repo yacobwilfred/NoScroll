@@ -20,6 +20,27 @@ CREATE VIRTUAL TABLE IF NOT EXISTS contents_fts USING fts5(
 );
 """
 
+_CONTENT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS contents (
+    id                TEXT PRIMARY KEY,
+    title             TEXT NOT NULL,
+    url               TEXT UNIQUE NOT NULL,
+    content_type      TEXT NOT NULL,
+    cluster_id        TEXT NOT NULL,
+    source            TEXT,
+    summary           TEXT,
+    author            TEXT,
+    published_at      TEXT,
+    duration_minutes  INTEGER,
+    read_time_minutes INTEGER,
+    language          TEXT DEFAULT 'en',
+    seed_query        TEXT,
+    ingested_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_content_type ON contents(content_type);
+CREATE INDEX IF NOT EXISTS idx_cluster_id   ON contents(cluster_id);
+"""
+
 
 def get_connection() -> sqlite3.Connection:
     con = sqlite3.connect(DB_PATH)
@@ -32,6 +53,16 @@ def row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
 
 
 # ── FTS index ─────────────────────────────────────────────────────────────────
+
+def ensure_content_schema() -> None:
+    """Ensure the core contents table exists (fresh DB-safe startup)."""
+    con = get_connection()
+    try:
+        con.executescript(_CONTENT_SCHEMA)
+        con.commit()
+    finally:
+        con.close()
+
 
 def ensure_fts_index() -> None:
     """

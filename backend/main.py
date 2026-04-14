@@ -54,6 +54,7 @@ app = FastAPI(
 
 @app.on_event("startup")
 def startup_event():
+    db.ensure_content_schema()
     db.ensure_fts_index()
     profile_router.ensure_profile_schema()
     identity_router.ensure_identity_schema()
