@@ -7,3 +7,5 @@ __pycache__/
 
 # Local SQLite — production uses Railway volume at /app/data
 data/noscroll.db
+data/noscroll.seed.db
+!data/noscroll.seed.db.gz

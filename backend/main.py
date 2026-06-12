@@ -3,6 +3,7 @@ import re
 import json
 import sqlite3
 import subprocess
+from pathlib import Path
 from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -71,6 +72,16 @@ app = FastAPI(
     version="0.1.0",
 )
 
+def _sync_bundled_content_corpus() -> None:
+    """Merge bundled gzip seed into live DB when CONTENT_DB_SEED_VERSION bumps."""
+    from sync_content_from_seed import maybe_sync_from_bundled_seed
+
+    version = os.environ.get("CONTENT_DB_SEED_VERSION", "")
+    seed_gz = Path(__file__).parent / "data" / "noscroll.seed.db.gz"
+    marker = db.DB_PATH.parent / ".content_db_seed_version"
+    maybe_sync_from_bundled_seed(db.DB_PATH, seed_gz, version, marker)
+
+
 def _ensure_content_corpus_loaded() -> None:
     """
     On fresh/ephemeral deploys, load bundled metadata into SQLite so
@@ -109,6 +120,7 @@ def _ensure_content_corpus_loaded() -> None:
 def startup_event():
     db.ensure_content_schema()
     db.ensure_embeddings_table()
+    _sync_bundled_content_corpus()
     _ensure_content_corpus_loaded()
     db.ensure_fts_index()
     profile_router.ensure_profile_schema()

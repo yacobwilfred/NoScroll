@@ -64,4 +64,10 @@ docker run --rm -p 8080:80 noscroll-web
 
 ## Content corpus
 
-The API needs a populated `contents` database for prompt search and directions. The demo seed only adds **users, friends, collections, and saved items**. For a full exploration experience, run your ingestion pipeline against the same volume-backed DB before sharing the link, or ship a prebuilt `noscroll.db` once (advanced).
+The API ships **`backend/data/noscroll.seed.db.gz`** (full local corpus: contents + embeddings). On startup, when `CONTENT_DB_SEED_VERSION` changes, the API **merges** that seed into `/app/data/noscroll.db` (profile/friends tables are preserved).
+
+- Default in root `Dockerfile`: `CONTENT_DB_SEED_VERSION=2025-06-12`
+- To push a new corpus later: replace the `.gz`, bump the version env on the API service, redeploy once
+- Marker file on the volume: `/app/data/.content_db_seed_version` (prevents re-merge on every restart)
+
+If the DB is **empty** and no seed version is set, the older JSON fallback (`CONTENT_SEED_FILE`) still loads `creative_content_metadata.json`.
