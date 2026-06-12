@@ -1,8 +1,99 @@
+import { useState, useRef, useLayoutEffect } from "react";
 import { motion } from "framer-motion";
 import ContentTypeTag from "./ContentTypeTag";
 import { focusCostTier } from "../cognitive";
 
 const SPRING_CORNER = { type: "spring", stiffness: 220, damping: 26 };
+const TITLE_LINE_GAP_PX = 6;
+
+function fitTextLength(text, maxWidth, probe) {
+  if (!text || maxWidth <= 0) return 0;
+
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    probe.textContent = text.slice(0, mid);
+    if (probe.offsetWidth <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+
+  if (lo > 0 && lo < text.length) {
+    const lastSpace = text.lastIndexOf(" ", lo);
+    if (lastSpace > 0) return lastSpace;
+  }
+  return lo;
+}
+
+function DirectionCornerTitle({ title, contentType, format, isRelax }) {
+  const containerRef = useRef(null);
+  const tagsRef = useRef(null);
+  const [lines, setLines] = useState({ line1: title, line2: "" });
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const measure = () => {
+      const fullTitle = title || "";
+      const style = getComputedStyle(container);
+      const probe = document.createElement("span");
+      probe.style.cssText = [
+        "position:absolute",
+        "visibility:hidden",
+        "white-space:nowrap",
+        `font:${style.fontWeight} ${style.fontSize} ${style.fontFamily}`,
+      ].join(";");
+      document.body.appendChild(probe);
+
+      const containerWidth = container.clientWidth;
+      const tagsWidth = tagsRef.current?.offsetWidth ?? 0;
+      const hasTags = tagsWidth > 0;
+      const line1Budget = hasTags
+        ? containerWidth - tagsWidth - TITLE_LINE_GAP_PX
+        : containerWidth;
+
+      const line1Len = fitTextLength(fullTitle, line1Budget, probe);
+      const line1 = fullTitle.slice(0, line1Len).trimEnd();
+      let line2 = fullTitle.slice(line1Len).trimStart();
+
+      if (line2) {
+        const line2Len = fitTextLength(line2, containerWidth, probe);
+        if (line2Len < line2.length) {
+          line2 = `${line2.slice(0, line2Len).trimEnd()}…`;
+        }
+      }
+
+      document.body.removeChild(probe);
+      setLines({ line1, line2 });
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(container);
+    if (tagsRef.current) ro.observe(tagsRef.current);
+    return () => ro.disconnect();
+  }, [title, contentType, format, isRelax]);
+
+  return (
+    <div className="direction-corner__title" ref={containerRef}>
+      <div className="direction-corner__title-line1">
+        {(contentType || (isRelax && format)) && (
+          <span className="direction-corner__title-tags" ref={tagsRef}>
+            {contentType && <ContentTypeTag type={contentType} />}
+            {isRelax && format && <span className="format-tag">{format}</span>}
+          </span>
+        )}
+        {lines.line1 && (
+          <span className="direction-corner__title-line1-text">{lines.line1}</span>
+        )}
+      </div>
+      {lines.line2 && (
+        <div className="direction-corner__title-line2">{lines.line2}</div>
+      )}
+    </div>
+  );
+}
 
 function formatCL(clHours) {
   if (!clHours) return null;
@@ -48,11 +139,12 @@ export default function DirectionCorner({
       {isRelax && direction.facet_value && (
         <span className="direction-corner__facet">{direction.label}</span>
       )}
-      <p className="direction-corner__title">
-        {preview?.content_type && <ContentTypeTag type={preview.content_type} />}
-        {isRelax && preview?.format && <span className="format-tag">{preview.format}</span>}
-        <span className="direction-corner__title-text">{preview?.title ?? direction.label}</span>
-      </p>
+      <DirectionCornerTitle
+        title={preview?.title ?? direction.label}
+        contentType={preview?.content_type}
+        format={preview?.format}
+        isRelax={isRelax}
+      />
       {cl !== null && (
         <span className={`direction-corner__cl direction-corner__cl--${focusCostTier(cl)} ${isRelax ? "direction-corner__cl--relax" : ""}`}>
           {formatCL(cl)} focus

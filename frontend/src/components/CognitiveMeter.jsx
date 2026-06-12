@@ -3,8 +3,10 @@ import { createPortal } from "react-dom";
 import FacialTracker from "./FacialTracker";
 
 const EAR_THRESHOLD = 0.20;
-const RING_SIZE = 100;
-const RING_STROKE = 7;
+const RING_SIZE = 88;
+const RING_STROKE = 6;
+const TICK_COUNT = 12;
+const TICK_GAP_DEG = 3.5;
 
 function getMeterColor(score) {
   if (score >= 0.70) return "#57c98a";
@@ -19,40 +21,71 @@ function getDrowsinessLevel(perclos) {
   return                     { label: "Drowsy",             color: "#e87676" };
 }
 
+function tickArcPath(cx, cy, r, index, total, gapDeg) {
+  const span = 360 / total;
+  const pad = gapDeg / 2;
+  const start = -90 + index * span + pad;
+  const end = -90 + (index + 1) * span - pad;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const x1 = cx + r * Math.cos(toRad(start));
+  const y1 = cy + r * Math.sin(toRad(start));
+  const x2 = cx + r * Math.cos(toRad(end));
+  const y2 = cy + r * Math.sin(toRad(end));
+  return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`;
+}
+
 function CircularBatteryRing({ ratio, color, size = RING_SIZE, stroke = RING_STROKE, className = "", children }) {
   const clamped = Math.max(0, Math.min(1, ratio));
   const r = (size - stroke) / 2;
   const cx = size / 2;
   const cy = size / 2;
-  const circumference = 2 * Math.PI * r;
-  const offset = circumference * (1 - clamped);
+  const filledTicks = clamped <= 0 ? 0 : Math.max(1, Math.round(clamped * TICK_COUNT));
 
   return (
     <div className={`cm-ring ${className}`} style={{ width: size, height: size }}>
       <svg className="cm-ring__svg" width={size} height={size} aria-hidden="true">
-        <circle
-          className="cm-ring__track"
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          strokeWidth={stroke}
-        />
-        <circle
-          className="cm-ring__fill"
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          transform={`rotate(-90 ${cx} ${cy})`}
-        />
+        {Array.from({ length: TICK_COUNT }, (_, i) => {
+          const filled = i < filledTicks;
+          return (
+            <path
+              key={i}
+              className={`cm-ring__tick ${filled ? "cm-ring__tick--filled" : "cm-ring__tick--empty"}`}
+              d={tickArcPath(cx, cy, r, i, TICK_COUNT, TICK_GAP_DEG)}
+              fill="none"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              style={{ stroke: filled ? color : "rgba(28, 24, 20, 0.14)" }}
+            />
+          );
+        })}
       </svg>
       <div className="cm-ring__center">{children}</div>
+    </div>
+  );
+}
+
+function DockStats({ hoursRemaining, energySpent, draining, drowsiness, cameraEnabled, trackerStatus }) {
+  const alertnessLabel = cameraEnabled && trackerStatus === "running"
+    ? drowsiness.label
+    : "Focus capacity";
+
+  return (
+    <div className="cm-ring-btn__stats">
+      <div className="cm-ring-btn__hours">
+        {hoursRemaining}
+        <span className="cm-ring-btn__unit">h left</span>
+      </div>
+      {energySpent > 0.001 && (
+        <span className={`cm-ring-btn__spent ${draining ? "cm-spent--pulse" : ""}`}>
+          −{energySpent.toFixed(2)}h spent
+        </span>
+      )}
+      <span
+        className="cm-ring-btn__alertness"
+        style={{ color: cameraEnabled && trackerStatus === "running" ? drowsiness.color : undefined }}
+      >
+        {alertnessLabel}
+      </span>
     </div>
   );
 }
@@ -216,15 +249,14 @@ export default function CognitiveMeter({ meter, cameraEnabled, onFaceUpdate, onO
             drowsiness={drowsiness}
           />
         </CircularBatteryRing>
-        <span className="cm-ring-btn__hours">
-          {hoursRemaining}
-          <span className="cm-ring-btn__unit">h</span>
-        </span>
-        {energySpent > 0.001 && (
-          <span className={`cm-ring-btn__spent ${draining ? "cm-spent--pulse" : ""}`}>
-            −{energySpent.toFixed(2)}
-          </span>
-        )}
+        <DockStats
+          hoursRemaining={hoursRemaining}
+          energySpent={energySpent}
+          draining={draining}
+          drowsiness={drowsiness}
+          cameraEnabled={cameraEnabled}
+          trackerStatus={trackerStatus}
+        />
       </button>
 
       {expanded && createPortal(
@@ -245,26 +277,27 @@ export default function CognitiveMeter({ meter, cameraEnabled, onFaceUpdate, onO
           </div>
 
           <div className="cm-panel-hero">
-            <CircularBatteryRing ratio={score} color={color} size={128} stroke={8}>
-              <div className="cm-ring__hours-inner">
-                {hoursRemaining}
-                <span className="cm-ring__hours-inner-unit">h</span>
-              </div>
+            <CircularBatteryRing ratio={score} color={color} size={120} stroke={7}>
+              <CameraCenter
+                cameraEnabled={cameraEnabled}
+                trackerStatus={trackerStatus}
+                previewCanvas={previewCanvas}
+                drowsiness={drowsiness}
+              />
             </CircularBatteryRing>
             <div className="cm-panel-hero__text">
               <div className="cm-score-big">
                 {hoursRemaining}
-                <span className="cm-score-unit">hrs of deep work</span>
+                <span className="cm-score-unit">h left</span>
+              </div>
+              <div className={`cm-panel-hero__spent ${draining ? "cm-consumed--pulse" : ""}`}>
+                <strong>−{energySpent.toFixed(2)}h</strong>
+                <span className="cm-consumed-of"> spent · {startingHours.toFixed(1)}h capacity</span>
               </div>
               <span className="cm-drowsiness-label" style={{ color: drowsiness.color }}>
                 {cameraEnabled && trackerStatus === "running" ? drowsiness.label : "Focus capacity"}
               </span>
             </div>
-          </div>
-
-          <div className={`cm-consumed ${draining ? "cm-consumed--pulse" : ""}`}>
-            Focus spent this session: <strong>{energySpent.toFixed(2)}h</strong>
-            <span className="cm-consumed-of"> of {startingHours.toFixed(1)}h capacity</span>
           </div>
 
           {cameraEnabled && trackerStatus === "running" && (
