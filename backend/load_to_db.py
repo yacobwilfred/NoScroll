@@ -25,7 +25,14 @@ CREATE TABLE IF NOT EXISTS contents (
     read_time_minutes INTEGER,
     language          TEXT DEFAULT 'en',
     seed_query        TEXT,
-    ingested_at       TEXT NOT NULL
+    ingested_at       TEXT NOT NULL,
+    cognitive_load    REAL,
+    vibe              TEXT DEFAULT 'deep',
+    category          TEXT,
+    format            TEXT,
+    image_url         TEXT,
+    reader_ready      INTEGER DEFAULT 0,
+    body_text         TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_content_type ON contents(content_type);
@@ -47,6 +54,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Load content metadata JSON into SQLite.")
     parser.add_argument("--input",  default=str(DEFAULT_JSON_PATH), help="Path to metadata JSON file.")
     parser.add_argument("--db",     default=str(DEFAULT_DB_PATH),   help="Path to SQLite database.")
+    parser.add_argument(
+        "--upsert-articles",
+        action="store_true",
+        help="Update existing deep articles on URL conflict (reader_ready, body_text).",
+    )
     args = parser.parse_args()
 
     json_path = Path(args.input)
@@ -66,41 +78,118 @@ def main() -> None:
     con = sqlite3.connect(db_path)
     con.executescript(SCHEMA)
 
+    # Migrate older databases that predate these columns.
+    existing_cols = {r[1] for r in con.execute("PRAGMA table_info(contents)").fetchall()}
+    for col, decl in (
+        ("cognitive_load", "REAL"),
+        ("vibe", "TEXT DEFAULT 'deep'"),
+        ("category", "TEXT"),
+        ("format", "TEXT"),
+        ("image_url", "TEXT"),
+        ("reader_ready", "INTEGER DEFAULT 0"),
+        ("body_text", "TEXT"),
+    ):
+        if col not in existing_cols:
+            con.execute(f"ALTER TABLE contents ADD COLUMN {col} {decl}")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_vibe ON contents(vibe)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_category ON contents(category)")
+
     inserted = 0
+    updated  = 0
     skipped  = 0
 
+    row_vals = lambda item, item_id: (
+        item_id,
+        item["title"],
+        item["url"],
+        item["content_type"],
+        item["cluster_id"],
+        item.get("source"),
+        item.get("summary"),
+        item.get("author"),
+        item.get("published_at"),
+        item.get("duration_minutes"),
+        item.get("read_time_minutes"),
+        item.get("language", "en"),
+        item.get("seed_query"),
+        now,
+        item.get("cognitive_load"),
+        item.get("vibe", "deep"),
+        item.get("category"),
+        item.get("format"),
+        item.get("image_url"),
+        1 if item.get("reader_ready") else 0,
+        item.get("body_text"),
+    )
+
     for item in items:
-        # Always generate a fresh UUID so sequential-ID collisions never block
-        # a new URL from being inserted. URL uniqueness handles deduplication.
         new_id = str(uuid.uuid4())
         try:
-            con.execute(
-                """
-                INSERT OR IGNORE INTO contents
-                  (id, title, url, content_type, cluster_id, source, summary,
-                   author, published_at, duration_minutes, read_time_minutes,
-                   language, seed_query, ingested_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    new_id,
-                    item["title"],
-                    item["url"],
-                    item["content_type"],
-                    item["cluster_id"],
-                    item.get("source"),
-                    item.get("summary"),
-                    item.get("author"),
-                    item.get("published_at"),
-                    item.get("duration_minutes"),
-                    item.get("read_time_minutes"),
-                    item.get("language", "en"),
-                    item.get("seed_query"),
-                    now,
-                ),
-            )
-            if con.execute("SELECT changes()").fetchone()[0]:
+            if item.get("vibe") == "relax":
+                # Upsert relax items so re-runs refresh reader_ready / body_text.
+                con.execute(
+                    """
+                    INSERT INTO contents
+                      (id, title, url, content_type, cluster_id, source, summary,
+                       author, published_at, duration_minutes, read_time_minutes,
+                       language, seed_query, ingested_at,
+                       cognitive_load, vibe, category, format, image_url,
+                       reader_ready, body_text)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(url) DO UPDATE SET
+                      reader_ready  = excluded.reader_ready,
+                      body_text     = COALESCE(excluded.body_text, contents.body_text),
+                      category      = excluded.category,
+                      format        = excluded.format,
+                      cognitive_load= excluded.cognitive_load,
+                      image_url     = COALESCE(excluded.image_url, contents.image_url),
+                      summary       = COALESCE(excluded.summary, contents.summary),
+                      vibe          = 'relax'
+                    """,
+                    row_vals(item, new_id),
+                )
+            elif args.upsert_articles and item.get("content_type") == "article":
+                con.execute(
+                    """
+                    INSERT INTO contents
+                      (id, title, url, content_type, cluster_id, source, summary,
+                       author, published_at, duration_minutes, read_time_minutes,
+                       language, seed_query, ingested_at,
+                       cognitive_load, vibe, category, format, image_url,
+                       reader_ready, body_text)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(url) DO UPDATE SET
+                      title           = excluded.title,
+                      cluster_id      = excluded.cluster_id,
+                      summary         = COALESCE(excluded.summary, contents.summary),
+                      author          = COALESCE(excluded.author, contents.author),
+                      read_time_minutes = COALESCE(excluded.read_time_minutes, contents.read_time_minutes),
+                      reader_ready    = excluded.reader_ready,
+                      body_text       = COALESCE(excluded.body_text, contents.body_text),
+                      ingested_at     = excluded.ingested_at
+                    """,
+                    row_vals(item, new_id),
+                )
+            else:
+                con.execute(
+                    """
+                    INSERT OR IGNORE INTO contents
+                      (id, title, url, content_type, cluster_id, source, summary,
+                       author, published_at, duration_minutes, read_time_minutes,
+                       language, seed_query, ingested_at,
+                       cognitive_load, vibe, category, format, image_url,
+                       reader_ready, body_text)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    row_vals(item, new_id),
+                )
+            changes = con.execute("SELECT changes()").fetchone()[0]
+            if changes:
                 inserted += 1
+            elif item.get("vibe") == "relax" or (
+                args.upsert_articles and item.get("content_type") == "article"
+            ):
+                updated += 1
             else:
                 skipped += 1
         except Exception as e:
@@ -129,6 +218,7 @@ def main() -> None:
 
     print(f"[done] db path    : {db_path}")
     print(f"[done] inserted   : {inserted}")
+    print(f"[done] updated    : {updated}")
     print(f"[done] skipped    : {skipped}")
     print(f"[done] run_id     : {run_id}")
 

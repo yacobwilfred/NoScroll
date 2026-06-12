@@ -35,11 +35,30 @@ CREATE TABLE IF NOT EXISTS contents (
     read_time_minutes INTEGER,
     language          TEXT DEFAULT 'en',
     seed_query        TEXT,
-    ingested_at       TEXT NOT NULL
+    ingested_at       TEXT NOT NULL,
+    cognitive_load    REAL,
+    vibe              TEXT DEFAULT 'deep',
+    category          TEXT,
+    format            TEXT,
+    image_url         TEXT,
+    reader_ready      INTEGER DEFAULT 0,
+    body_text         TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_content_type ON contents(content_type);
 CREATE INDEX IF NOT EXISTS idx_cluster_id   ON contents(cluster_id);
 """
+
+# Columns added after the original schema shipped — applied as migrations on
+# startup so existing databases pick them up without a rebuild.
+_MIGRATION_COLUMNS = {
+    "cognitive_load": "REAL",
+    "vibe":           "TEXT DEFAULT 'deep'",
+    "category":       "TEXT",
+    "format":         "TEXT",
+    "image_url":      "TEXT",
+    "reader_ready":   "INTEGER DEFAULT 0",
+    "body_text":      "TEXT",
+}
 
 
 def get_connection() -> sqlite3.Connection:
@@ -59,6 +78,13 @@ def ensure_content_schema() -> None:
     con = get_connection()
     try:
         con.executescript(_CONTENT_SCHEMA)
+        # Migrate older databases: add any columns introduced after launch.
+        existing = {r["name"] for r in con.execute("PRAGMA table_info(contents)").fetchall()}
+        for col, decl in _MIGRATION_COLUMNS.items():
+            if col not in existing:
+                con.execute(f"ALTER TABLE contents ADD COLUMN {col} {decl}")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_vibe ON contents(vibe)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_category ON contents(category)")
         con.commit()
     finally:
         con.close()
@@ -108,6 +134,24 @@ def _sanitize_fts_keywords(keywords: List[str]) -> str:
 
 # ── Query helpers ─────────────────────────────────────────────────────────────
 
+def article_readable_sql(prefix: str = "") -> str:
+    """SQL clause: non-articles pass; articles must be marked reader_ready."""
+    p = f"{prefix}." if prefix else ""
+    return f"({p}content_type != 'article' OR {p}reader_ready = 1)"
+
+
+def mark_content_reader_ready(content_id: str, body_text: str) -> None:
+    con = get_connection()
+    try:
+        con.execute(
+            "UPDATE contents SET reader_ready = 1, body_text = ? WHERE id = ?",
+            (body_text, content_id),
+        )
+        con.commit()
+    finally:
+        con.close()
+
+
 def get_content_by_id(content_id: str) -> Optional[Dict[str, Any]]:
     con = get_connection()
     try:
@@ -125,6 +169,7 @@ def search_contents(
     cluster_id: Optional[str] = None,
     content_type: Optional[str] = None,
     exclude_ids: Optional[List[str]] = None,
+    articles_readable_only: bool = False,
     limit: int = 40,
 ) -> List[Dict[str, Any]]:
     """
@@ -133,7 +178,10 @@ def search_contents(
     """
     if not keywords:
         return get_random_content(
-            cluster_id=cluster_id, exclude_ids=exclude_ids, limit=limit
+            cluster_id=cluster_id,
+            exclude_ids=exclude_ids,
+            articles_readable_only=articles_readable_only,
+            limit=limit,
         )
 
     con = get_connection()
@@ -141,7 +189,10 @@ def search_contents(
         fts_query = _sanitize_fts_keywords(keywords)
         if not fts_query:
             return get_random_content(
-                cluster_id=cluster_id, exclude_ids=exclude_ids, limit=limit
+                cluster_id=cluster_id,
+                exclude_ids=exclude_ids,
+                articles_readable_only=articles_readable_only,
+                limit=limit,
             )
 
         # FTS join — SELECT c.* preserves only contents columns (no rank bleed)
@@ -163,6 +214,8 @@ def search_contents(
             placeholders = ",".join("?" * len(exclude_ids))
             sql += f" AND c.id NOT IN ({placeholders})"
             params.extend(exclude_ids)
+        if articles_readable_only:
+            sql += f" AND {article_readable_sql('c')}"
 
         # BM25 rank: lower value = more relevant in SQLite FTS5
         sql += " ORDER BY fts.rank LIMIT ?"
@@ -183,6 +236,7 @@ def search_contents(
         cluster_id=cluster_id,
         content_type=content_type,
         exclude_ids=exclude_ids,
+        articles_readable_only=articles_readable_only,
         limit=limit,
     )
 
@@ -193,6 +247,7 @@ def _search_like_fallback(
     cluster_id: Optional[str] = None,
     content_type: Optional[str] = None,
     exclude_ids: Optional[List[str]] = None,
+    articles_readable_only: bool = False,
     limit: int = 40,
 ) -> List[Dict[str, Any]]:
     """Original LIKE-based search, used as a fallback."""
@@ -221,6 +276,8 @@ def _search_like_fallback(
             placeholders = ",".join("?" * len(exclude_ids))
             conditions.append(f"id NOT IN ({placeholders})")
             params.extend(exclude_ids)
+        if articles_readable_only:
+            conditions.append(article_readable_sql())
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         rows = con.execute(
@@ -237,6 +294,7 @@ def get_contents_by_cluster(
     *,
     exclude_ids: Optional[List[str]] = None,
     content_type: Optional[str] = None,
+    articles_readable_only: bool = False,
     limit: int = 20,
 ) -> List[Dict[str, Any]]:
     con = get_connection()
@@ -251,6 +309,8 @@ def get_contents_by_cluster(
             placeholders = ",".join("?" * len(exclude_ids))
             conditions.append(f"id NOT IN ({placeholders})")
             params.extend(exclude_ids)
+        if articles_readable_only:
+            conditions.append(article_readable_sql())
 
         where = "WHERE " + " AND ".join(conditions)
         rows = con.execute(
@@ -293,6 +353,7 @@ def get_similar_in_cluster(
     center_vector: bytes,
     cluster_id: str,
     exclude_ids: Optional[List[str]] = None,
+    articles_readable_only: bool = False,
     limit: int = 3,
 ) -> List[Dict[str, Any]]:
     """
@@ -311,6 +372,8 @@ def get_similar_in_cluster(
             placeholders = ",".join("?" * len(exclude_ids))
             conditions.append(f"c.id NOT IN ({placeholders})")
             params.extend(exclude_ids)
+        if articles_readable_only:
+            conditions.append(article_readable_sql("c"))
 
         where = "WHERE " + " AND ".join(conditions)
         rows = con.execute(
@@ -350,6 +413,7 @@ def get_nearest_neighbor(
     *,
     exclude_ids: Optional[List[str]] = None,
     cluster_id: Optional[str] = None,
+    articles_readable_only: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """
     Linear scan over all embeddings to find the most similar content item.
@@ -370,6 +434,8 @@ def get_nearest_neighbor(
             placeholders = ",".join("?" * len(exclude_ids))
             conditions.append(f"c.id NOT IN ({placeholders})")
             params.extend(exclude_ids)
+        if articles_readable_only:
+            conditions.append(article_readable_sql("c"))
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         rows = con.execute(
@@ -409,6 +475,11 @@ def get_random_content(
     *,
     exclude_ids: Optional[List[str]] = None,
     cluster_id: Optional[str] = None,
+    vibe: Optional[str] = None,
+    category: Optional[str] = None,
+    content_type: Optional[str] = None,
+    reader_ready_only: bool = False,
+    articles_readable_only: bool = False,
     limit: int = 1,
 ) -> List[Dict[str, Any]]:
     con = get_connection()
@@ -419,6 +490,19 @@ def get_random_content(
         if cluster_id:
             conditions.append("cluster_id = ?")
             params.append(cluster_id)
+        if vibe:
+            conditions.append("vibe = ?")
+            params.append(vibe)
+        if category:
+            conditions.append("category = ?")
+            params.append(category)
+        if content_type:
+            conditions.append("content_type = ?")
+            params.append(content_type)
+        if reader_ready_only:
+            conditions.append("reader_ready = 1")
+        if articles_readable_only:
+            conditions.append(article_readable_sql())
         if exclude_ids:
             placeholders = ",".join("?" * len(exclude_ids))
             conditions.append(f"id NOT IN ({placeholders})")
@@ -430,5 +514,36 @@ def get_random_content(
             params + [limit],
         ).fetchall()
         return [row_to_dict(r) for r in rows]
+    finally:
+        con.close()
+
+
+def get_relax_categories(
+    exclude_ids: Optional[List[str]] = None,
+    reader_ready_only: bool = True,
+) -> List[Dict[str, Any]]:
+    """Distinct relax-vibe categories with available item counts, richest first."""
+    con = get_connection()
+    try:
+        conditions = ["vibe = 'relax'", "category IS NOT NULL", "category != ''"]
+        if reader_ready_only:
+            conditions.append("reader_ready = 1")
+        params: List[Any] = []
+        if exclude_ids:
+            placeholders = ",".join("?" * len(exclude_ids))
+            conditions.append(f"id NOT IN ({placeholders})")
+            params.extend(exclude_ids)
+        where = "WHERE " + " AND ".join(conditions)
+        rows = con.execute(
+            f"""
+            SELECT category, COUNT(*) AS n
+            FROM contents
+            {where}
+            GROUP BY category
+            ORDER BY n DESC
+            """,
+            params,
+        ).fetchall()
+        return [{"category": r["category"], "count": r["n"]} for r in rows]
     finally:
         con.close()

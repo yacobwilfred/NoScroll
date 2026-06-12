@@ -18,27 +18,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getUserToken } from "../utils/userToken";
 import { getFriendsFeed, getMyIdentity, startSessionFromExternal } from "../api";
 import ContentTypeTag from "../components/ContentTypeTag";
+import { fibonacciSphere } from "../utils/fibonacciSphere";
 
 const MAX_ITEMS = 15;
 const SPHERE_RADIUS = 3.8;
-
-// ── Fibonacci sphere distribution ─────────────────────────────────────────────
-
-function fibonacciSphere(n, radius) {
-  const points = [];
-  const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~2.399 radians
-  for (let i = 0; i < n; i++) {
-    const y = 1 - (i / (n - 1)) * 2;          // -1 to 1
-    const r = Math.sqrt(1 - y * y);
-    const theta = goldenAngle * i;
-    points.push([
-      Math.cos(theta) * r * radius,
-      y * radius,
-      Math.sin(theta) * r * radius,
-    ]);
-  }
-  return points;
-}
 
 // ── Single card in 3D space ────────────────────────────────────────────────────
 

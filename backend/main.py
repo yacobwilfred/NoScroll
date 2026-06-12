@@ -1,17 +1,23 @@
 import os
+import re
+import json
 import sqlite3
 import subprocess
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Literal
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 
 import db
 import session as session_manager
+from relax_reader import is_in_app_ready
 import user_profile as profile_router
 import identity as identity_router
+import google_health
 from models import (
     ContentNode,
     Direction,
@@ -46,6 +52,18 @@ class ReaderViewResponse(BaseModel):
     top_image: Optional[str] = None
     success: bool
     fallback_summary: Optional[str] = None
+
+
+class ArxivReaderResponse(BaseModel):
+    format: Literal["html", "pdf"]
+    url: str
+
+
+# New-style (2305.08493v2) and legacy category paths (astro-ph/0410258v1)
+ARXIV_ID_RE = re.compile(
+    r"^(\d+\.\d+(v\d+)?|[a-z][\w-]*/\d+(v\d+)?)$",
+    re.IGNORECASE,
+)
 
 app = FastAPI(
     title="NoScroll API",
@@ -121,10 +139,13 @@ def health_check():
 
 @app.post("/session/start", response_model=SessionStartResponse)
 def start_session(body: SessionStartRequest):
-    if not body.prompt or not body.prompt.strip():
+    mode = getattr(body, "mode", "deep") or "deep"
+    if mode != "relax" and (not body.prompt or not body.prompt.strip()):
         raise HTTPException(status_code=400, detail="Prompt must not be empty.")
     try:
-        session_id, center_node, directions = session_manager.start_session(body.prompt.strip())
+        session_id, center_node, directions = session_manager.start_session(
+            (body.prompt or "").strip(), mode=mode
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
@@ -175,7 +196,27 @@ def get_content(content_id: str):
         duration_minutes=item.get("duration_minutes"),
         read_time_minutes=item.get("read_time_minutes"),
         language=item.get("language", "en"),
+        cognitive_load=item.get("cognitive_load"),
+        vibe=item.get("vibe") or "deep",
+        category=item.get("category"),
+        format=item.get("format"),
+        image_url=item.get("image_url"),
     )
+
+
+@app.get("/health/today")
+def get_health_today():
+    """
+    Return today's biometrics (HRV, resting HR, sleep) from the Google Health
+    API for the connected Fitbit Charge 6, mapped to the Cognitive Meter model.
+    Credentials are read server-side from backend/.env.
+    """
+    try:
+        return google_health.get_today()
+    except google_health.GoogleHealthError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Google Health API error: {str(e)}")
 
 
 @app.get("/session/{session_id}/breadcrumb")
@@ -284,6 +325,37 @@ def get_audio_url(content_id: str):
         raise HTTPException(status_code=502, detail=f"Failed to fetch or parse RSS feed: {e}")
 
 
+def _arxiv_pdf_url(arxiv_id: str) -> str:
+    return f"https://arxiv.org/pdf/{arxiv_id}"
+
+
+def _arxiv_html_available(arxiv_id: str) -> bool:
+    html_url = f"https://arxiv.org/html/{arxiv_id}"
+    req = urllib.request.Request(
+        html_url,
+        method="HEAD",
+        headers={"User-Agent": "NoScroll/1.0 (paper-reader)"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            return 200 <= resp.status < 300
+    except Exception:
+        return False
+
+
+@app.get("/arxiv/reader", response_model=ArxivReaderResponse)
+def get_arxiv_reader(arxiv_id: str):
+    """Prefer arXiv HTML when available; otherwise fall back to PDF."""
+    arxiv_id = arxiv_id.strip().strip("/")
+    if not ARXIV_ID_RE.match(arxiv_id):
+        raise HTTPException(status_code=400, detail="Invalid arXiv ID")
+
+    pdf_url = _arxiv_pdf_url(arxiv_id)
+    if _arxiv_html_available(arxiv_id):
+        return ArxivReaderResponse(format="html", url=f"https://arxiv.org/html/{arxiv_id}")
+    return ArxivReaderResponse(format="pdf", url=pdf_url)
+
+
 @app.get("/content/{content_id}/reader", response_model=ReaderViewResponse)
 def get_reader_view(content_id: str):
     item = db.get_content_by_id(content_id)
@@ -292,6 +364,27 @@ def get_reader_view(content_id: str):
 
     url = item.get("url", "")
     fallback_summary = item.get("summary") or None
+
+    # Pre-stored body (Reddit self-posts, full RSS entries) — no scrape needed.
+    stored_body = (item.get("body_text") or "").strip()
+    if stored_body and len(stored_body) >= 100:
+        if (
+            item.get("content_type") == "article"
+            and is_in_app_ready(item)
+            and not item.get("reader_ready")
+        ):
+            db.mark_content_reader_ready(content_id, stored_body)
+        return ReaderViewResponse(
+            content_id=content_id,
+            title=item["title"],
+            author=item.get("author"),
+            published_at=item.get("published_at"),
+            body_html=None,
+            body_text=stored_body,
+            top_image=item.get("image_url"),
+            success=True,
+            fallback_summary=fallback_summary,
+        )
 
     try:
         import newspaper
@@ -314,6 +407,10 @@ def get_reader_view(content_id: str):
                 success=False,
                 fallback_summary=fallback_summary,
             )
+
+        candidate = {**item, "body_text": body_text}
+        if item.get("content_type") == "article" and is_in_app_ready(candidate):
+            db.mark_content_reader_ready(content_id, body_text)
 
         return ReaderViewResponse(
             content_id=content_id,

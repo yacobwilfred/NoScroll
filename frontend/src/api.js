@@ -1,10 +1,10 @@
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
-export async function startSession(prompt) {
+export async function startSession(prompt, mode = "deep") {
   const res = await fetch(`${BASE}/session/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, mode }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -36,6 +36,28 @@ export async function getReaderView(contentId) {
   const res = await fetch(`${BASE}/content/${contentId}/reader`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+export async function getArxivReaderUrl(arxivId) {
+  const params = new URLSearchParams({ arxiv_id: arxivId });
+  const res = await fetch(`${BASE}/arxiv/reader?${params}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function fetchGoogleHealthToday() {
+  const res = await fetch(`${BASE}/health/today`);
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  if (data.rmssd == null && data.restingHr == null && data.sleepScore == null) {
+    throw new Error("No biometric data available yet. Wear your Fitbit overnight and sync it.");
+  }
+  return {
+    rmssd:        data.rmssd ?? null,
+    restingHr:    data.restingHr ?? null,
+    sleepScore:   data.sleepScore ?? null,
+    sleepMinutes: data.sleepMinutes ?? null,
+  };
 }
 
 export async function getAudioUrl(contentId) {

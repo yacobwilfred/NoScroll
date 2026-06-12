@@ -15,6 +15,11 @@ class ContentNode(BaseModel):
     duration_minutes: Optional[int] = None
     read_time_minutes: Optional[int] = None
     language: str = "en"
+    cognitive_load: Optional[float] = None  # estimated hours of focused attention required
+    vibe: str = "deep"                       # "deep" | "relax"
+    category: Optional[str] = None           # relax-mode topic tag (e.g. "Comedy")
+    format: Optional[str] = None             # relax-mode form tag (e.g. "webcomic")
+    image_url: Optional[str] = None          # poster/comic image for visual formats
 
 
 class Direction(BaseModel):
@@ -23,10 +28,13 @@ class Direction(BaseModel):
     cluster_id: str              # the cluster this direction points into
     description: str             # short explanation of why this direction
     preview: ContentNode         # representative content item for this direction
+    facet_type: Optional[str] = None   # "category" | "format" | None (cluster nav)
+    facet_value: Optional[str] = None  # the tag value this direction navigates to
 
 
 class SessionStartRequest(BaseModel):
     prompt: str
+    mode: str = "deep"           # "deep" | "relax"
 
 
 class SessionStartResponse(BaseModel):

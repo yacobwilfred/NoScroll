@@ -1,46 +1,46 @@
 /**
- * Global persistent top navigation bar.
- * Always visible. Active tab is highlighted.
- * In the graph phase, "New Prompt" is hidden — the graph's own "↩ New topic" handles that.
+ * Floating capsule switch between Deep and Relax.
  */
 import { motion } from "framer-motion";
 
-export default function TopNav({ activeTab, onNewPrompt, onFriendsPicks, onProfile }) {
+const THUMB_SPRING = { type: "spring", stiffness: 420, damping: 34 };
+
+export default function TopNav({ activeTab, onDeep, onRelax }) {
   return (
-    <nav className="topnav">
-      <NavBtn
-        label="New Prompt"
-        active={activeTab === "prompt"}
-        onClick={onNewPrompt}
-      />
-      <NavBtn
-        label="Friends' Picks"
-        active={activeTab === "friends"}
-        onClick={onFriendsPicks}
-      />
-      <NavBtn
-        label="Profile"
-        active={activeTab === "profile"}
-        onClick={onProfile}
-      />
+    <nav className="topnav" aria-label="Browse mode">
+      <div className="topnav__capsule" role="tablist">
+        <CapsuleOption
+          label="Deep"
+          active={activeTab === "deep"}
+          onClick={onDeep}
+        />
+        <CapsuleOption
+          label="Relax"
+          active={activeTab === "relax"}
+          onClick={onRelax}
+        />
+      </div>
     </nav>
   );
 }
 
-function NavBtn({ label, active, onClick }) {
+function CapsuleOption({ label, active, onClick }) {
   return (
     <button
+      type="button"
+      role="tab"
+      aria-selected={active}
       className={`topnav-btn ${active ? "topnav-btn--active" : ""}`}
       onClick={onClick}
     >
-      {label}
       {active && (
         <motion.span
-          className="topnav-btn__pip"
-          layoutId="topnav-pip"
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          className="topnav__thumb"
+          layoutId="topnav-thumb"
+          transition={THUMB_SPRING}
         />
       )}
+      <span className="topnav-btn__label">{label}</span>
     </button>
   );
 }

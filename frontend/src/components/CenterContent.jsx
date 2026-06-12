@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { getReaderView, getAudioUrl } from "../api";
+import { getReaderView, getAudioUrl, getArxivReaderUrl } from "../api";
 import ContentTypeTag from "./ContentTypeTag";
+import { focusCostTier } from "../cognitive";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -23,8 +24,10 @@ function getSpotifyEpisodeId(url) {
 
 function getArxivId(url) {
   try {
-    const match = url.match(/arxiv\.org\/(?:abs|pdf)\/([^\s/?#]+)/);
-    return match ? match[1] : null;
+    const match = url.match(/arxiv\.org\/(?:abs|pdf|html)\/([^?#]+)/i);
+    if (!match) return null;
+    const id = match[1].replace(/\/$/, "");
+    return id || null;
   } catch { return null; }
 }
 
@@ -53,7 +56,7 @@ function VideoCenter({ node }) {
   );
 }
 
-function ArticleCenter({ node }) {
+function ArticleCenter({ node, inAppOnly = false }) {
   const [status, setStatus] = useState("loading");
   const [reader, setReader] = useState(null);
 
@@ -86,11 +89,17 @@ function ArticleCenter({ node }) {
         {reader.body_text.split("\n\n").map((para, i) => (
           <p key={i}>{para}</p>
         ))}
-        <a className="cc-link cc-link--subtle" href={node.url} target="_blank" rel="noopener noreferrer">
-          Read original →
-        </a>
+        {!inAppOnly && (
+          <a className="cc-link cc-link--subtle" href={node.url} target="_blank" rel="noopener noreferrer">
+            Read original →
+          </a>
+        )}
       </div>
     );
+  }
+
+  if (inAppOnly) {
+    return <p className="cc-summary cc-summary--muted">This content isn&apos;t available in-app.</p>;
   }
 
   // Extract a readable domain name for attribution
@@ -178,19 +187,101 @@ function PodcastCenter({ node }) {
   );
 }
 
+function ImageCenter({ node, inAppOnly = false }) {
+  const [errored, setErrored] = useState(false);
+  let domain = "";
+  try { domain = new URL(node.url).hostname.replace(/^www\./, ""); } catch { /* noop */ }
+
+  if (node.image_url && !errored) {
+    return (
+      <div className="cc-image-body">
+        <img
+          className="cc-image"
+          src={node.image_url}
+          alt={node.title}
+          onError={() => setErrored(true)}
+        />
+        {node.summary && <p className="cc-image-caption">{node.summary}</p>}
+        {!inAppOnly && (
+          <a className="cc-link cc-link--subtle" href={node.url} target="_blank" rel="noopener noreferrer">
+            View original{domain ? ` on ${domain}` : ""} →
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  if (inAppOnly) {
+    return <p className="cc-summary cc-summary--muted">This image isn&apos;t available in-app.</p>;
+  }
+
+  return (
+    <div className="cc-fallback cc-fallback--article">
+      {node.summary
+        ? <p className="cc-summary">{node.summary}</p>
+        : <p className="cc-summary cc-summary--muted">No preview available.</p>}
+      <div className="cc-fallback__footer">
+        {domain && <span className="cc-fallback__source">{domain}</span>}
+        <a className="cc-link cc-link--secondary" href={node.url} target="_blank" rel="noopener noreferrer">
+          Open in browser ↗
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function PaperCenter({ node }) {
   const arxivId = getArxivId(node.url);
   const [view, setView] = useState("abstract"); // "abstract" | "reader"
+  const [readerUrl, setReaderUrl] = useState(null);
+  const [readerFormat, setReaderFormat] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  if (view === "reader" && arxivId) {
+  useEffect(() => {
+    setView("abstract");
+    setReaderUrl(null);
+    setReaderFormat(null);
+    setLoading(false);
+  }, [node.id]);
+
+  async function openReader() {
+    if (!arxivId || loading) return;
+    setLoading(true);
+    const pdfFallback = `https://arxiv.org/pdf/${arxivId}`;
+    try {
+      const { format, url } = await getArxivReaderUrl(arxivId);
+      setReaderFormat(format);
+      setReaderUrl(url);
+      setView("reader");
+    } catch {
+      // API unreachable or check failed — PDF almost always works for arXiv IDs.
+      setReaderFormat("pdf");
+      setReaderUrl(pdfFallback);
+      setView("reader");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (view === "reader" && readerUrl) {
     return (
       <div className="cc-paper-reader">
-        <button className="cc-back-btn" onClick={() => setView("abstract")}>← Abstract</button>
+        <div className="cc-paper-reader__bar">
+          <button className="cc-back-btn" onClick={() => setView("abstract")}>← Abstract</button>
+          <a
+            className="cc-link cc-link--subtle"
+            href={node.url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open on arXiv ↗
+          </a>
+        </div>
         <iframe
           className="cc-paper-iframe"
-          src={`https://arxiv.org/html/${arxivId}`}
+          src={readerUrl}
           title={node.title}
-          sandbox="allow-scripts allow-same-origin allow-popups"
+          sandbox={readerFormat === "html" ? "allow-scripts allow-same-origin allow-popups" : undefined}
         />
       </div>
     );
@@ -205,8 +296,8 @@ function PaperCenter({ node }) {
         </div>
       )}
       {arxivId && (
-        <button className="cc-read-btn" onClick={() => setView("reader")}>
-          Read full paper →
+        <button className="cc-read-btn" onClick={openReader} disabled={loading}>
+          {loading ? "Loading…" : "Read full paper →"}
         </button>
       )}
       {!arxivId && (
@@ -218,16 +309,24 @@ function PaperCenter({ node }) {
   );
 }
 
+// ── cognitive load helpers ────────────────────────────────────────────────────
+
+function formatCL(clHours) {
+  if (!clHours) return null;
+  if (clHours < 1) return `~${Math.round(clHours * 60)} min`;
+  return `~${clHours.toFixed(1)}h`;
+}
+
 // ── main component ────────────────────────────────────────────────────────────
 
-export default function CenterContent({ node, savedItemId, onSave, onUnsave }) {
+export default function CenterContent({ node, savedItemId, onSave, onUnsave, mode = "deep" }) {
   const isVideo = node.content_type === "video";
   const isSaved = Boolean(savedItemId);
+  const isRelax = mode === "relax";
   const meta = node.duration_minutes
     ? `${node.duration_minutes} min`
-    : node.read_time_minutes
-    ? `${node.read_time_minutes} min read`
     : null;
+  const cl = node.cognitive_load ?? null;
 
   function handleSaveToggle() {
     if (isSaved) onUnsave?.(savedItemId);
@@ -239,24 +338,24 @@ export default function CenterContent({ node, savedItemId, onSave, onUnsave }) {
       {isVideo ? (
         <>
           <VideoCenter node={node} />
-          {/* Floating save button for videos */}
-          <button
-            className={`cc-save-btn cc-save-btn--floating ${isSaved ? "cc-save-btn--saved" : ""}`}
-            onClick={handleSaveToggle}
-            title={isSaved ? "Unsave" : "Save"}
-            aria-label={isSaved ? "Unsave" : "Save"}
-          >
-            {isSaved ? "⊛" : "⊙"}
-          </button>
-        </>
-      ) : (
-        <>
-          <div className="center-content__header">
+          <div className="center-content__video-overlay">
             <div className="center-content__header-row">
-              <ContentTypeTag type={node.content_type} />
+              {isRelax
+                ? (node.format
+                    ? <span className="format-tag">{node.format}</span>
+                    : <ContentTypeTag type={node.content_type} />)
+                : <ContentTypeTag type={node.content_type} />}
               {meta && <span className="center-content__meta">{meta}</span>}
+              {cl !== null && (
+                <span
+                  className={`center-content__cl center-content__cl--${focusCostTier(cl)} ${isRelax ? "center-content__cl--relax" : ""}`}
+                  title="Estimated focus cost"
+                >
+                  ⚡ {formatCL(cl)} focus
+                </span>
+              )}
               <button
-                className={`cc-save-btn ${isSaved ? "cc-save-btn--saved" : ""}`}
+                className={`cc-save-btn cc-save-btn--on-video ${isSaved ? "cc-save-btn--saved" : ""}`}
                 onClick={handleSaveToggle}
                 title={isSaved ? "Unsave" : "Save"}
                 aria-label={isSaved ? "Unsave" : "Save"}
@@ -267,10 +366,42 @@ export default function CenterContent({ node, savedItemId, onSave, onUnsave }) {
             <h2 className="center-content__title">{node.title}</h2>
             {node.author && <p className="center-content__author">{node.author}</p>}
           </div>
+        </>
+      ) : (
+        <>
+          <div className="center-content__header">
+            <div className="center-content__header-row">
+              {isRelax
+                ? (node.format
+                    ? <span className="format-tag">{node.format}</span>
+                    : <ContentTypeTag type={node.content_type} />)
+                : <ContentTypeTag type={node.content_type} />}
+              {meta && <span className="center-content__meta">{meta}</span>}
+              {cl !== null && (
+                <span
+                  className={`center-content__cl center-content__cl--${focusCostTier(cl)} ${isRelax ? "center-content__cl--relax" : ""}`}
+                  title="Estimated focus cost"
+                >
+                  ⚡ {formatCL(cl)} focus
+                </span>
+              )}
+              <button
+                className={`cc-save-btn ${isSaved ? "cc-save-btn--saved" : ""}`}
+                onClick={handleSaveToggle}
+                title={isSaved ? "Unsave" : "Save"}
+                aria-label={isSaved ? "Unsave" : "Save"}
+              >
+                {isSaved ? "⊛" : "⊙"}
+              </button>
+            </div>
+          </div>
           <div className="center-content__body">
-            {node.content_type === "article" && <ArticleCenter node={node} />}
+            <h2 className="center-content__title">{node.title}</h2>
+            {node.author && <p className="center-content__author">{node.author}</p>}
+            {node.content_type === "article" && <ArticleCenter node={node} inAppOnly={isRelax} />}
             {node.content_type === "podcast" && <PodcastCenter node={node} />}
             {node.content_type === "paper"   && <PaperCenter node={node} />}
+            {node.content_type === "image"   && <ImageCenter node={node} inAppOnly={isRelax} />}
           </div>
         </>
       )}

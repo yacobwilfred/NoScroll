@@ -27,8 +27,10 @@ function getSpotifyEpisodeId(url) {
 
 function getArxivId(url) {
   try {
-    const match = url.match(/arxiv\.org\/(?:abs|pdf)\/([^\s/?#]+)/);
-    return match ? match[1] : null;
+    const match = url.match(/arxiv\.org\/(?:abs|pdf|html)\/([^?#]+)/i);
+    if (!match) return null;
+    const id = match[1].replace(/\/$/, "");
+    return id || null;
   } catch {
     return null;
   }

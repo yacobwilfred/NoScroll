@@ -1,0 +1,9 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Local SQLite — production uses Railway volume at /app/data
+data/noscroll.db

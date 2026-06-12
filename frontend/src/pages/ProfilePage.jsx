@@ -240,8 +240,7 @@ function ConnectorLines({ avatarRef, nodeRefs, containerRef, tick }) {
           <motion.line
             key={`${i}-${line.x2.toFixed(0)}-${line.y2.toFixed(0)}`}
             x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
-            stroke="rgba(100,130,255,0.4)"
-            strokeWidth="1.5"
+            stroke="var(--line-color)"
             strokeDasharray={len}
             initial={{ strokeDashoffset: len, opacity: 0 }}
             animate={{ strokeDashoffset: 0, opacity: 1 }}

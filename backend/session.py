@@ -307,6 +307,11 @@ def _content_to_node(item: Dict) -> ContentNode:
         duration_minutes=item.get("duration_minutes"),
         read_time_minutes=item.get("read_time_minutes"),
         language=item.get("language", "en"),
+        cognitive_load=item.get("cognitive_load"),
+        vibe=item.get("vibe") or "deep",
+        category=item.get("category"),
+        format=item.get("format"),
+        image_url=item.get("image_url"),
     )
 
 
@@ -342,6 +347,7 @@ def _pick_preview_for_cluster(
     center_vector: Optional[bytes] = None,
     center_keywords: Optional[List[str]] = None,
     used_types: Optional[List[str]] = None,
+    articles_readable_only: bool = False,
 ) -> Optional[ContentNode]:
     """
     Pick the most relevant preview item for a direction cluster.
@@ -354,7 +360,11 @@ def _pick_preview_for_cluster(
     # 1. Embedding similarity — fetch a wider pool so we can pick a diverse type
     if center_vector:
         items = _db.get_similar_in_cluster(
-            center_vector, cluster_id, exclude_ids=exclude_ids, limit=8
+            center_vector,
+            cluster_id,
+            exclude_ids=exclude_ids,
+            articles_readable_only=articles_readable_only,
+            limit=8,
         )
         if items:
             return _content_to_node(_prefer_diverse(items, used_types))
@@ -365,15 +375,25 @@ def _pick_preview_for_cluster(
             keywords=center_keywords,
             cluster_id=cluster_id,
             exclude_ids=exclude_ids,
+            articles_readable_only=articles_readable_only,
             limit=8,
         )
         if hits:
             return _content_to_node(_prefer_diverse(hits, used_types))
 
     # 3. Random from cluster (last resort)
-    items = get_contents_by_cluster(cluster_id, exclude_ids=exclude_ids, limit=10)
+    items = get_contents_by_cluster(
+        cluster_id,
+        exclude_ids=exclude_ids,
+        articles_readable_only=articles_readable_only,
+        limit=10,
+    )
     if not items:
-        items = get_random_content(exclude_ids=exclude_ids, limit=1)
+        items = get_random_content(
+            exclude_ids=exclude_ids,
+            articles_readable_only=articles_readable_only,
+            limit=1,
+        )
     if not items:
         return None
     return _content_to_node(_prefer_diverse(items, used_types))
@@ -405,6 +425,7 @@ def build_directions(
             center_vector=center_vector,
             center_keywords=center_keywords,
             used_types=used_types,
+            articles_readable_only=True,
         )
         if preview is None:
             continue
@@ -424,26 +445,143 @@ def build_directions(
     return directions
 
 
+# ── Relax-mode navigation (tag-based) ─────────────────────────────────────────
+
+# Short, friendly copy for the relax category tags shown on directions.
+RELAX_CATEGORY_META = {
+    "Comedy":            "Light laughs and feel-good fun",
+    "Music":             "Performances and sounds to enjoy",
+    "Pets & Animals":    "Cute, calming creatures",
+    "Travel":            "Easy escapes and pretty places",
+    "Howto & Style":     "Playful little how-tos",
+    "Human Interest":    "Heart-warming everyday stories",
+    "Food":              "Tasty, low-effort treats",
+    "Art & Whimsy":      "Doodles, comics and small delights",
+    "Nature":            "Slow, soothing outdoors",
+}
+
+
+def _relax_category_label(category: str) -> str:
+    return category
+
+
+def _relax_category_description(category: str) -> str:
+    return RELAX_CATEGORY_META.get(category, "More easy, light-hearted picks")
+
+
+def build_relax_directions(
+    center: ContentNode,
+    exclude_ids: List[str],
+) -> List[Direction]:
+    """
+    In relax mode the 4 directions are *tag axes*, not clusters: each points
+    to a relax-vibe category. We always offer "more of the same" category plus
+    a few neighbouring categories, each previewed by a real relax item.
+    """
+    exclude = list(dict.fromkeys(exclude_ids))  # de-dupe, keep order
+    cats = [c["category"] for c in _db.get_relax_categories(exclude_ids=exclude)]
+
+    ordered: List[str] = []
+    if center.category and center.category in cats:
+        ordered.append(center.category)
+    for c in cats:
+        if c not in ordered:
+            ordered.append(c)
+
+    directions: List[Direction] = []
+    used_preview_ids = set(exclude)
+
+    for i, category in enumerate(ordered[:4]):
+        picks = _db.get_random_content(
+            vibe="relax",
+            category=category,
+            exclude_ids=list(used_preview_ids),
+            reader_ready_only=True,
+            limit=1,
+        )
+        if not picks:
+            continue
+        preview = _content_to_node(picks[0])
+        used_preview_ids.add(preview.id)
+
+        same = category == center.category
+        directions.append(
+            Direction(
+                id=f"dir_{i + 1}",
+                label=("More " + _relax_category_label(category)) if same
+                       else _relax_category_label(category),
+                cluster_id=preview.cluster_id,
+                description=_relax_category_description(category),
+                preview=preview,
+                facet_type="category",
+                facet_value=category,
+            )
+        )
+
+    return directions
+
+
 # ── Session API ───────────────────────────────────────────────────────────────
 
-def start_session(prompt: str) -> Tuple[str, ContentNode, List[Direction]]:
+def _start_relax_session(session_id: str, prompt: str) -> Tuple[str, ContentNode, List[Direction]]:
+    """Relax mode: pick a light-hearted center, then tag-based directions."""
+    # Optionally seed by a category the prompt hints at; otherwise just random.
+    center_item = None
+    if prompt:
+        kws = _extract_keywords(prompt)
+        if kws:
+            hits = search_contents(keywords=kws, limit=20)
+            center_item = next(
+                (h for h in hits if h.get("vibe") == "relax" and h.get("reader_ready")),
+                None,
+            )
+    if not center_item:
+        picks = get_random_content(vibe="relax", reader_ready_only=True, limit=1)
+        center_item = picks[0] if picks else None
+    # Fallback to any content if no relax corpus is loaded yet.
+    if not center_item:
+        picks = get_random_content(limit=1)
+        center_item = picks[0] if picks else None
+    if center_item is None:
+        raise RuntimeError("No content available in database.")
+
+    center_node = _content_to_node(center_item)
+    directions = build_relax_directions(center_node, exclude_ids=[center_node.id])
+
+    _sessions[session_id] = {
+        "breadcrumb": [center_node.id],
+        "visited_ids": {center_node.id},
+        "mode": "relax",
+    }
+    return session_id, center_node, directions
+
+
+def start_session(prompt: str, mode: str = "deep") -> Tuple[str, ContentNode, List[Direction]]:
     session_id = str(uuid.uuid4())
+
+    if mode == "relax":
+        return _start_relax_session(session_id, prompt)
 
     # Try embedding-based initial search first (best relevance)
     center_item = None
     prompt_vector = _encode_text(prompt)
     if prompt_vector:
-        center_item = _db.get_nearest_neighbor(prompt_vector)
+        center_item = _db.get_nearest_neighbor(
+            prompt_vector, articles_readable_only=True
+        )
 
     # Fallback: FTS keyword search
     if not center_item:
         keywords = _extract_keywords(prompt)
-        candidates = search_contents(keywords=keywords, limit=20) if keywords else []
+        candidates = (
+            search_contents(keywords=keywords, articles_readable_only=True, limit=20)
+            if keywords else []
+        )
         center_item = candidates[0] if candidates else None
 
     # Last resort: random
     if not center_item:
-        results = get_random_content(limit=1)
+        results = get_random_content(articles_readable_only=True, limit=1)
         center_item = results[0] if results else None
 
     if center_item is None:
@@ -466,6 +604,7 @@ def start_session(prompt: str) -> Tuple[str, ContentNode, List[Direction]]:
     _sessions[session_id] = {
         "breadcrumb": [center_node.id],
         "visited_ids": {center_node.id},
+        "mode": "deep",
     }
 
     return session_id, center_node, directions
@@ -485,17 +624,32 @@ def expand_session(
         _sessions[session_id] = session
 
     visited_ids = list(session["visited_ids"])
+    mode = session.get("mode", "deep")
 
     new_center_item = None
     if chosen_content_id:
-        new_center_item = get_content_by_id(chosen_content_id)
+        picked = get_content_by_id(chosen_content_id)
+        if picked and (
+            picked.get("content_type") != "article" or picked.get("reader_ready")
+        ):
+            new_center_item = picked
 
     if not new_center_item:
-        candidates = get_contents_by_cluster(
-            chosen_cluster_id, exclude_ids=visited_ids, limit=20
-        )
+        if mode == "relax":
+            candidates = get_random_content(
+                vibe="relax", exclude_ids=visited_ids, reader_ready_only=True, limit=20
+            )
+        else:
+            candidates = get_contents_by_cluster(
+                chosen_cluster_id,
+                exclude_ids=visited_ids,
+                articles_readable_only=True,
+                limit=20,
+            )
         if not candidates:
-            candidates = get_random_content(exclude_ids=visited_ids, limit=1)
+            candidates = get_random_content(
+                exclude_ids=visited_ids, articles_readable_only=True, limit=1
+            )
         if not candidates:
             raise RuntimeError("No more content available in this direction.")
         new_center_item = random.choice(candidates)
@@ -504,16 +658,21 @@ def expand_session(
     session["breadcrumb"].append(new_center.id)
     session["visited_ids"].add(new_center.id)
 
-    center_vector = _db.get_embedding(new_center.id)
-    center_keywords = _extract_keywords(
-        f"{new_center.title} {new_center.summary or ''}"
-    )
-    directions = build_directions(
-        new_center.cluster_id,
-        exclude_ids=list(session["visited_ids"]),
-        center_keywords=center_keywords,
-        center_vector=center_vector,
-    )
+    if mode == "relax":
+        directions = build_relax_directions(
+            new_center, exclude_ids=list(session["visited_ids"])
+        )
+    else:
+        center_vector = _db.get_embedding(new_center.id)
+        center_keywords = _extract_keywords(
+            f"{new_center.title} {new_center.summary or ''}"
+        )
+        directions = build_directions(
+            new_center.cluster_id,
+            exclude_ids=list(session["visited_ids"]),
+            center_keywords=center_keywords,
+            center_vector=center_vector,
+        )
 
     return new_center, directions, list(session["breadcrumb"])
 

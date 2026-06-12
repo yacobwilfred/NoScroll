@@ -1,12 +1,15 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
 import {
   startSession, expandSession, saveItem, unsaveItem, listSaved,
   createCollection, addToCollection,
 } from "./api";
 import { getUserToken } from "./utils/userToken";
+import { computeCognitiveMeter, hoursSinceWake, computeAlertnessScore } from "./cognitive";
 import PromptScreen from "./components/PromptScreen";
 import TopNav from "./components/TopNav";
+import ProfileNavButton from "./components/ProfileNavButton";
+import SiteLogo from "./components/SiteLogo";
 import NodeGraph from "./components/NodeGraph";
 import ProfileDrawer from "./components/ProfileDrawer";
 import SaveModal from "./components/SaveModal";
@@ -14,6 +17,9 @@ import PublicCollectionPage from "./components/PublicCollectionPage";
 import ProfilePage from "./pages/ProfilePage";
 import UserProfilePage from "./pages/UserProfilePage";
 import FriendsPicksPage from "./pages/FriendsPicksPage";
+import CognitiveMeter from "./components/CognitiveMeter";
+import CognitiveSettings from "./components/CognitiveSettings";
+import VideoBackground from "./components/VideoBackground";
 
 // ── Simple path-based routing ─────────────────────────────────────────────────
 function getRoute() {
@@ -24,16 +30,22 @@ function getRoute() {
   if (userMatch) return { type: "user-profile", handle: userMatch[1] };
   if (path === "/profile") return { type: "profile" };
   if (path === "/friends") return { type: "friends" };
-  return { type: "app" };
+  if (path === "/relax") return { type: "app", browseMode: "relax" };
+  return { type: "app", browseMode: "deep" };
 }
 
-function navigate(path) {
-  window.history.pushState({}, "", path);
-  window.dispatchEvent(new PopStateEvent("popstate"));
+function browseModeFromPath(path = window.location.pathname) {
+  return path === "/relax" ? "relax" : "deep";
 }
 
 export default function App() {
   const [route, setRoute] = useState(getRoute);
+
+  function navigate(path) {
+    window.history.pushState({}, "", path);
+    setRoute(getRoute());
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
 
   useEffect(() => {
     function onPop() { setRoute(getRoute()); }
@@ -41,6 +53,7 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  const page = (() => {
   // Static routes (no shared app state needed)
   if (route.type === "public-collection") {
     return <PublicCollectionPage colId={route.id} />;
@@ -62,10 +75,8 @@ export default function App() {
     return (
       <div className="app">
         <TopNav
-          activeTab="friends"
-          onNewPrompt={() => navigate("/")}
-          onFriendsPicks={() => navigate("/friends")}
-          onProfile={() => navigate("/profile")}
+          onDeep={() => navigate("/")}
+          onRelax={() => navigate("/relax")}
         />
         <FriendsPicksPage
           onExploreContent={(data) => {
@@ -78,14 +89,33 @@ export default function App() {
   }
 
   if (route.type === "profile") {
-    return <MainApp initialPhase="profile" />;
+    return <MainApp initialPhase="profile" navigate={navigate} />;
   }
 
-  return <MainApp initialPhase="prompt" />;
+  return (
+    <MainApp
+      initialPhase="prompt"
+      initialBrowseMode={route.browseMode ?? "deep"}
+      navigate={navigate}
+    />
+  );
+  })();
+
+  return (
+    <>
+      <VideoBackground />
+      <SiteLogo onNavigate={() => navigate("/")} />
+      <ProfileNavButton
+        active={route.type === "profile"}
+        onClick={() => navigate("/profile")}
+      />
+      {page}
+    </>
+  );
 }
 
-// ── Main app (prompt + graph + profile) ──────────────────────────────────────
-function MainApp({ initialPhase = "prompt" }) {
+// ── Main app (prompt + graph + profile) ────────────────────────────────────────
+function MainApp({ initialPhase = "prompt", initialBrowseMode = "deep", navigate }) {
   const [phase, setPhase] = useState(initialPhase);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -94,11 +124,122 @@ function MainApp({ initialPhase = "prompt" }) {
   const [centerNode, setCenterNode] = useState(null);
   const [directions, setDirections] = useState([]);
   const [breadcrumb, setBreadcrumb] = useState([]);
-  const [enterFrom, setEnterFrom] = useState(null);
+  const [explorationHistory, setExplorationHistory] = useState([]);
+  const [graphInitialEnter, setGraphInitialEnter] = useState(false);
+  const graphNavRef = useRef(null);
+  const explorationHistoryRef = useRef(explorationHistory);
+  explorationHistoryRef.current = explorationHistory;
+  const [browseMode, setBrowseMode] = useState(initialBrowseMode);
+  const [sessionMode, setSessionMode] = useState("deep");
+
+  useEffect(() => {
+    function syncFromPath() {
+      const path = window.location.pathname;
+      if (path === "/profile") {
+        setPhase("profile");
+        return;
+      }
+      setBrowseMode(browseModeFromPath());
+      setPhase((prev) => (prev === "profile" ? "prompt" : prev));
+    }
+    syncFromPath();
+    window.addEventListener("popstate", syncFromPath);
+    return () => window.removeEventListener("popstate", syncFromPath);
+  }, []);
 
   const [userToken] = useState(() => getUserToken());
   const [savedItemsMap, setSavedItemsMap] = useState(new Map());
   const [pendingSaveNode, setPendingSaveNode] = useState(null);
+
+  // ── Cognitive Meter state ─────────────────────────────────────────────────
+  // Configured via the settings panel (battery icon) during exploration.
+  const [meterConfig, setMeterConfig] = useState({
+    bioMode: "fitbit",                                  // 'fitbit' | 'manual'
+    fitbit: null,                                       // { rmssd, restingHr, sleepScore }
+    manual: { rmssd: 45, restingHr: 60, sleepScore: 75 },
+    hoursSinceWaking: 3,
+    lastMealHrsAgo: 3,
+    caffeineHrsAgo: null,
+    cameraEnabled: true,                                // on by default; banner nudges if off
+  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cameraPromptDismissed, setCameraPromptDismissed] = useState(false);
+  const [faceData, setFaceData] = useState({ perclos: 0, blinkRate: 15, faceDetected: true });
+  const [sessionStartTime, setSessionStartTime] = useState(null);
+  // Hours of focus spent engaging with content this session (direct battery debit)
+  const [energySpent, setEnergySpent] = useState(0);
+  const lastFaceUpdateRef = useRef(0);
+  const engagementRef = useRef(0.85); // smoothed (EMA) real-time engagement 0–1
+
+  // Refs so the consumption interval can read fresh values without resubscribing
+  const faceDataRef = useRef(faceData);       faceDataRef.current = faceData;
+  const centerNodeRef = useRef(centerNode);   centerNodeRef.current = centerNode;
+  const meterConfigRef = useRef(meterConfig); meterConfigRef.current = meterConfig;
+
+  function updateMeterConfig(patch) {
+    setMeterConfig(prev => ({ ...prev, ...patch }));
+  }
+
+  // ── Consumption loop ──────────────────────────────────────────────────────
+  // Every 10s while exploring, drain the battery by k · load · engagement · dt.
+  // engagement comes from eye tracking (smoothed); no face → pauses; camera off
+  // → assumes a neutral 0.85. Accumulates across content, resets on New Prompt.
+  useEffect(() => {
+    if (phase !== "graph" || !sessionStartTime) return;
+    const TICK_MS    = 5_000;
+    const K          = 1.0;          // global drain-rate knob
+    const ALPHA      = 0.22;         // EMA factor → ~20s smoothing at 5s tick
+    const FALLBACK_LOAD = 0.3;       // used if a node has no cognitive_load
+
+    const id = setInterval(() => {
+      const cfg = meterConfigRef.current;
+      const fd  = faceDataRef.current;
+
+      let eInst;
+      if (!cfg.cameraEnabled)               eInst = 0.85;             // no signal → neutral
+      else if (fd.faceDetected === false)   eInst = 0;               // away → pause
+      else eInst = computeAlertnessScore(fd.perclos ?? 0, fd.blinkRate ?? 15);
+
+      engagementRef.current += ALPHA * (eInst - engagementRef.current);
+
+      const load    = centerNodeRef.current?.cognitive_load ?? FALLBACK_LOAD;
+      const dEnergy = K * load * engagementRef.current * (TICK_MS / 3_600_000);
+      if (dEnergy > 0) setEnergySpent(prev => prev + dEnergy);
+    }, TICK_MS);
+    return () => clearInterval(id);
+  }, [phase, sessionStartTime]);
+
+  const meter = useMemo(() => {
+    const bio = meterConfig.bioMode === "manual"
+      ? meterConfig.manual
+      : (meterConfig.fitbit ?? { rmssd: null, restingHr: null, sleepScore: null });
+    // In Fitbit mode, derive wake time from the synced sleep end; fall back to
+    // the manual "when did you wake up?" chip when it's missing or stale.
+    const autoWake = meterConfig.bioMode === "fitbit"
+      ? hoursSinceWake(meterConfig.fitbit?.wakeTime)
+      : null;
+    return computeCognitiveMeter({
+      rmssd:            bio.rmssd,
+      restingHr:        bio.restingHr,
+      sleepScore:       bio.sleepScore,
+      hoursSinceWaking: autoWake ?? meterConfig.hoursSinceWaking,
+      lastMealHrsAgo:   meterConfig.lastMealHrsAgo,
+      caffeineHrsAgo:   meterConfig.caffeineHrsAgo,
+      perclos:          faceData.perclos,
+      blinkRate:        faceData.blinkRate,
+      cameraEnabled:    meterConfig.cameraEnabled,
+      energySpent,
+    });
+  }, [meterConfig, faceData, energySpent]);
+
+  function handleFaceUpdate(data) {
+    const now = Date.now();
+    // Always let presence changes through promptly; otherwise throttle to ~3s.
+    const presenceChanged = (data.faceDetected === false) !== (faceDataRef.current.faceDetected === false);
+    if (!presenceChanged && now - lastFaceUpdateRef.current < 3000) return;
+    lastFaceUpdateRef.current = now;
+    setFaceData(data);
+  }
 
   useEffect(() => {
     listSaved(userToken)
@@ -121,15 +262,32 @@ function MainApp({ initialPhase = "prompt" }) {
 
   // ── Session ──────────────────────────────────────────────────────────────────
 
-  async function handlePromptSubmit(prompt) {
+  function makeHistoryEntry(centerNode, directions, breadcrumb, enteredFrom = null) {
+    return { centerNode, directions, breadcrumb, enteredFrom };
+  }
+
+  function initExplorationHistory(centerNode, directions) {
+    setExplorationHistory([
+      makeHistoryEntry(centerNode, directions, [centerNode.id], null),
+    ]);
+  }
+
+  async function handlePromptSubmit(prompt, mode = "deep") {
     setLoading(true);
     setError(null);
+    setSessionMode(mode);
+    setBrowseMode(mode);
     try {
-      const data = await startSession(prompt);
+      const data = await startSession(prompt, mode);
       setSessionId(data.session_id);
       setCenterNode(data.center_node);
       setDirections(data.directions);
       setBreadcrumb([data.center_node.id]);
+      initExplorationHistory(data.center_node, data.directions);
+      setSessionStartTime(Date.now());
+      setEnergySpent(0);
+      engagementRef.current = 0.85;
+      setGraphInitialEnter(true);
       setPhase("graph");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -144,14 +302,17 @@ function MainApp({ initialPhase = "prompt" }) {
     setCenterNode(data.center_node);
     setDirections(data.directions);
     setBreadcrumb([data.center_node.id]);
-    setEnterFrom(null);
+    initExplorationHistory(data.center_node, data.directions);
+    setSessionStartTime(Date.now());
+    setEnergySpent(0);
+    engagementRef.current = 0.85;
+    setGraphInitialEnter(true);
     setPhase("graph");
   }
 
   const handleDirectionClick = useCallback(async (direction, position) => {
-    if (loading) return;
+    setGraphInitialEnter(false);
     setLoading(true);
-    setEnterFrom(position ?? null);
     setError(null);
     try {
       const data = await expandSession({
@@ -164,27 +325,102 @@ function MainApp({ initialPhase = "prompt" }) {
       setCenterNode(data.center_node);
       setDirections(data.directions);
       setBreadcrumb(data.breadcrumb);
+      setExplorationHistory((h) => [
+        ...h,
+        makeHistoryEntry(data.center_node, data.directions, data.breadcrumb, position),
+      ]);
     } catch {
       setError("Could not load content. Try another direction.");
+      throw new Error("expand failed");
     } finally {
       setLoading(false);
     }
-  }, [loading, sessionId, centerNode]);
+  }, [sessionId, centerNode]);
 
-  function handleReset() {
-    setPhase("prompt");
+  const handleBackPrepare = useCallback(() => {
+    const hist = explorationHistoryRef.current;
+    if (hist.length <= 1) return null;
+    const exitVia = hist[hist.length - 1].enteredFrom ?? "tr";
+    return {
+      exitVia,
+      commit: () => {
+        const h = explorationHistoryRef.current;
+        const prev = h[h.length - 2];
+        setExplorationHistory(h.slice(0, -1));
+        setCenterNode(prev.centerNode);
+        setDirections(prev.directions);
+        setBreadcrumb(prev.breadcrumb);
+        setGraphInitialEnter(false);
+        setError(null);
+      },
+    };
+  }, []);
+
+  function restoreHistoryIndex(index) {
+    if (index < 0 || index >= explorationHistory.length - 1) return;
+    const target = explorationHistory[index];
+    setExplorationHistory((h) => h.slice(0, index + 1));
+    setCenterNode(target.centerNode);
+    setDirections(target.directions);
+    setBreadcrumb(target.breadcrumb);
+    setGraphInitialEnter(false);
+    setError(null);
+  }
+
+  function handleHopClick(index) {
+    if (index >= explorationHistory.length - 1 || loading) return;
+    if (index === explorationHistory.length - 2) {
+      graphNavRef.current?.goBack();
+      return;
+    }
+    restoreHistoryIndex(index);
+  }
+
+  function handleBackClick() {
+    if (explorationHistory.length <= 1 || loading) return;
+    graphNavRef.current?.goBack();
+  }
+
+  function clearSession() {
     setSessionId(null);
     setCenterNode(null);
     setDirections([]);
     setBreadcrumb([]);
-    setEnterFrom(null);
+    setExplorationHistory([]);
+    setGraphInitialEnter(false);
     setError(null);
-    navigate("/");
   }
 
-  function handleGoToProfile() {
-    setPhase("profile");
-    navigate("/profile");
+  function handleReset() {
+    setPhase("prompt");
+    clearSession();
+    navigate(browseMode === "relax" ? "/relax" : "/");
+  }
+
+  function handleSelectBrowseMode(mode) {
+    const path = mode === "relax" ? "/relax" : "/";
+
+    if (phase === "graph" && mode === sessionMode) {
+      setPhase("prompt");
+      clearSession();
+      navigate(path);
+      return;
+    }
+
+    if (mode !== browseMode) {
+      setBrowseMode(mode);
+      if (phase === "graph") {
+        setPhase("prompt");
+        clearSession();
+      }
+    }
+
+    if (phase === "profile") {
+      setBrowseMode(mode);
+      setPhase("prompt");
+    }
+
+    navigate(path);
   }
 
   function handleBackFromProfile() {
@@ -256,16 +492,17 @@ function MainApp({ initialPhase = "prompt" }) {
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
+  const navActiveTab = phase === "graph" ? sessionMode : browseMode;
+
   const navProps = {
-    onNewPrompt: handleReset,
-    onFriendsPicks: () => navigate("/friends"),
-    onProfile: handleGoToProfile,
+    onDeep: () => handleSelectBrowseMode("deep"),
+    onRelax: () => handleSelectBrowseMode("relax"),
   };
 
   if (phase === "profile") {
     return (
       <div className="app">
-        <TopNav activeTab="profile" {...navProps} />
+        <TopNav activeTab={navActiveTab} {...navProps} />
         <ProfilePage
           onExploreContent={(data) => handleSessionData(data)}
           onBack={handleBackFromProfile}
@@ -286,49 +523,101 @@ function MainApp({ initialPhase = "prompt" }) {
 
   return (
     <div className="app">
-      <TopNav
-        activeTab={phase === "prompt" ? "prompt" : null}
-        {...navProps}
-      />
+      <TopNav activeTab={navActiveTab} {...navProps} />
+
+      {(phase === "prompt" || phase === "graph") && (
+        <div className="cm-dock">
+          <CognitiveMeter
+            meter={meter}
+            cameraEnabled={meterConfig.cameraEnabled}
+            onFaceUpdate={handleFaceUpdate}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+        </div>
+      )}
+
+      {(phase === "prompt" || phase === "graph") && !meterConfig.cameraEnabled && !cameraPromptDismissed && (
+        <div className="camera-prompt">
+          <span className="camera-prompt__icon">👁</span>
+          <span className="camera-prompt__text">
+            Enable focus tracking so your battery reflects how much attention you actually spend.
+          </span>
+          <button
+            className="camera-prompt__btn"
+            onClick={() => { updateMeterConfig({ cameraEnabled: true }); setCameraPromptDismissed(true); }}
+          >
+            Enable camera
+          </button>
+          <button
+            className="camera-prompt__dismiss"
+            onClick={() => setCameraPromptDismissed(true)}
+            aria-label="Dismiss"
+          >✕</button>
+        </div>
+      )}
 
       {phase === "prompt" && (
         <PromptScreen
           onSubmit={handlePromptSubmit}
           loading={loading}
-          savedCount={savedItemsList.length}
+          mode={browseMode}
         />
       )}
 
       {phase === "graph" && centerNode && (
-        <div className="graph-screen">
+        <div className={`graph-screen ${sessionMode === "relax" ? "graph-screen--relax" : ""}`}>
           <div className="graph-topbar">
+            <div className="graph-topbar__left">
+              {explorationHistory.length > 1 && (
+                <button
+                  type="button"
+                  className="graph-back-btn"
+                  onClick={handleBackClick}
+                  disabled={loading}
+                >
+                  ← Back
+                </button>
+              )}
+            </div>
             <div className="graph-topbar__right">
               {error && <span className="graph-error">{error}</span>}
-              <div className="graph-hops">
+              <div className="graph-hops" aria-label="Exploration path">
                 {breadcrumb.map((_, i) => (
-                  <span
+                  <button
                     key={i}
-                    className={`graph-hop-dot ${i === breadcrumb.length - 1 ? "graph-hop-dot--active" : ""}`}
+                    type="button"
+                    className={`graph-hop-dot ${i === breadcrumb.length - 1 ? "graph-hop-dot--active" : ""} ${i < breadcrumb.length - 1 ? "graph-hop-dot--clickable" : ""}`}
+                    onClick={() => handleHopClick(i)}
+                    disabled={loading || i === breadcrumb.length - 1}
+                    aria-label={i === breadcrumb.length - 1 ? `Hop ${i + 1}, current` : `Go back to hop ${i + 1}`}
                   />
                 ))}
               </div>
             </div>
           </div>
 
-          <AnimatePresence mode="wait">
-            <NodeGraph
-              key={centerNode.id}
-              centerNode={centerNode}
-              directions={directions}
-              onDirectionClick={handleDirectionClick}
-              loading={loading}
-              enterFrom={enterFrom}
-              savedItemId={currentSavedItem?.id ?? null}
-              onSave={handleRequestSave}
-              onUnsave={handleUnsave}
-            />
-          </AnimatePresence>
+          <NodeGraph
+            ref={graphNavRef}
+            centerNode={centerNode}
+            directions={directions}
+            onDirectionClick={handleDirectionClick}
+            onBackPrepare={handleBackPrepare}
+            loading={loading}
+            isInitial={graphInitialEnter}
+            savedItemId={currentSavedItem?.id ?? null}
+            onSave={handleRequestSave}
+            onUnsave={handleUnsave}
+            mode={sessionMode}
+          />
         </div>
+      )}
+
+      {settingsOpen && (
+        <CognitiveSettings
+          config={meterConfig}
+          onChange={updateMeterConfig}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
 
       <AnimatePresence>

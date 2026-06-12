@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import re
+import sqlite3
 import time
 import urllib.parse
 import urllib.request
@@ -10,7 +11,6 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
 
 TYPE_WEIGHTS = {
     "article": 0.40,
@@ -31,15 +31,42 @@ def load_seed_config(path: Path) -> Dict[str, Any]:
         return json.load(f)
 
 
-def parse_iso8601_duration_minutes(duration: str) -> Optional[int]:
-    # Handles strings like PT1H3M20S
+def parse_iso8601_duration_seconds(duration: str) -> Optional[int]:
     match = re.match(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$", duration or "")
     if not match:
         return None
     hours = int(match.group(1) or 0)
     minutes = int(match.group(2) or 0)
     seconds = int(match.group(3) or 0)
-    return (hours * 60) + minutes + (1 if seconds >= 30 else 0)
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def parse_iso8601_duration_minutes(duration: str) -> Optional[int]:
+    secs = parse_iso8601_duration_seconds(duration)
+    if secs is None:
+        return None
+    return secs // 60 + (1 if secs % 60 >= 30 else 0)
+
+
+_SHORTS_RE = re.compile(
+    r"(#shorts\b|#short\b|youtube\s+shorts?\b|\bshorts\s*#)",
+    re.IGNORECASE,
+)
+
+
+def is_youtube_short(title: str, description: str, duration_seconds: Optional[int]) -> bool:
+    """Heuristic: exclude YouTube Shorts (vertical short-form), keep regular videos."""
+    blob = f"{title} {description}"
+    if _SHORTS_RE.search(blob):
+        return True
+    if duration_seconds is None:
+        return False
+    # Classic Shorts are ≤60s; newer Shorts cap at 3 minutes.
+    if duration_seconds <= 60:
+        return True
+    if duration_seconds <= 180 and _SHORTS_RE.search(blob):
+        return True
+    return False
 
 
 def build_request(url: str) -> urllib.request.Request:
@@ -52,6 +79,61 @@ def http_get_text(url: str, timeout: int = DEFAULT_HTTP_TIMEOUT) -> str:
         return resp.read().decode("utf-8", errors="replace")
 
 
+def child_content_html(node: ET.Element) -> str:
+    """Extract full HTML body from RSS content:encoded / Atom content."""
+    for child in list(node):
+        lname = local_name(child.tag)
+        if lname not in ("encoded", "content"):
+            continue
+        parts: List[str] = []
+        if child.text:
+            parts.append(child.text)
+        for sub in list(child):
+            parts.append(ET.tostring(sub, encoding="unicode"))
+            if sub.tail:
+                parts.append(sub.tail)
+        html = "".join(parts).strip()
+        if html:
+            return html
+    return ""
+
+
+def finalize_article_item(
+    item: Dict[str, Any],
+    *,
+    scrape_fallback: bool = False,
+    scrape_delay: float = 0.25,
+) -> Optional[Dict[str, Any]]:
+    """Keep only articles with a full in-app body (RSS HTML or optional scrape)."""
+    from relax_reader import body_from_rss_html, is_in_app_ready, validate_article_url
+
+    body_html = item.get("body_html") or ""
+    body = body_from_rss_html(body_html) if body_html else None
+
+    if not body and scrape_fallback:
+        time.sleep(scrape_delay)
+        ok, scraped = validate_article_url(item["url"])
+        if ok and scraped:
+            body = scraped
+
+    if not body:
+        return None
+
+    candidate = {**item, "body_text": body, "content_type": "article"}
+    if not is_in_app_ready(candidate):
+        return None
+
+    word_count = len(body.split())
+    item = {
+        **item,
+        "body_text": body,
+        "reader_ready": True,
+        "read_time_minutes": max(1, round(word_count / 200)),
+    }
+    item.pop("body_html", None)
+    return item
+
+
 def fetch_rss_or_atom_items(
     feed_url: str,
     *,
@@ -59,6 +141,9 @@ def fetch_rss_or_atom_items(
     content_type: str,
     max_items: int = 80,
     min_duration_minutes: Optional[int] = None,
+    validate_articles: bool = False,
+    scrape_fallback: bool = False,
+    scrape_delay: float = 0.25,
 ) -> List[Dict[str, Any]]:
     try:
         xml_text = http_get_text(feed_url)
@@ -88,20 +173,29 @@ def fetch_rss_or_atom_items(
         if not title or not link:
             continue
 
-        entries.append(
-            {
-                "title": title,
-                "url": link,
-                "summary": clean_text(summary),
-                "author": author,
-                "published_at": published,
-                "source": feed_url,
-                "content_type": content_type,
-                "cluster_id": cluster_id,
-                "duration_minutes": duration_minutes,
-                "language": "en",
-            }
-        )
+        row = {
+            "title": title,
+            "url": link,
+            "summary": clean_text(summary),
+            "author": author,
+            "published_at": published,
+            "source": feed_url,
+            "content_type": content_type,
+            "cluster_id": cluster_id,
+            "duration_minutes": duration_minutes,
+            "language": "en",
+            "body_html": entry.get("body_html") or "",
+        }
+        if validate_articles and content_type == "article":
+            finalized = finalize_article_item(
+                row,
+                scrape_fallback=scrape_fallback,
+                scrape_delay=scrape_delay,
+            )
+            if finalized:
+                entries.append(finalized)
+        else:
+            entries.append(row)
     return entries
 
 
@@ -166,6 +260,7 @@ def extract_feed_entries(root: ET.Element) -> List[Dict[str, Any]]:
                 "author": author,
                 "published_at": published_at,
                 "duration_minutes": duration_minutes,
+                "body_html": child_content_html(elem),
             }
         )
     return entries
@@ -275,6 +370,10 @@ def fetch_youtube_items(
     *,
     max_results: int = 50,
     min_duration_minutes: int = 5,
+    max_duration_minutes: Optional[int] = None,
+    min_duration_seconds: Optional[int] = None,
+    max_duration_seconds: Optional[int] = None,
+    exclude_shorts: bool = False,
 ) -> List[Dict[str, Any]]:
     encoded_query = urllib.parse.quote_plus(query)
     search_url = (
@@ -311,13 +410,31 @@ def fetch_youtube_items(
         snippet = item.get("snippet", {})
         details = item.get("contentDetails", {})
         duration_raw = details.get("duration", "")
-        duration_minutes = parse_iso8601_duration_minutes(duration_raw)
-        if duration_minutes is not None and duration_minutes < min_duration_minutes:
+        duration_seconds = parse_iso8601_duration_seconds(duration_raw)
+        duration_minutes = (
+            duration_seconds // 60 + (1 if duration_seconds % 60 >= 30 else 0)
+            if duration_seconds is not None else None
+        )
+        if min_duration_seconds is not None:
+            if duration_seconds is None or duration_seconds < min_duration_seconds:
+                continue
+        elif duration_minutes is not None and duration_minutes < min_duration_minutes:
+            continue
+        if max_duration_seconds is not None:
+            if duration_seconds is None or duration_seconds > max_duration_seconds:
+                continue
+        elif (
+            max_duration_minutes is not None
+            and duration_minutes is not None
+            and duration_minutes > max_duration_minutes
+        ):
             continue
 
         video_id = item.get("id")
         title = (snippet.get("title") or "").strip()
         description = (snippet.get("description") or "").strip()
+        if exclude_shorts and is_youtube_short(title, description, duration_seconds):
+            continue
         channel = (snippet.get("channelTitle") or "").strip()
         published = (snippet.get("publishedAt") or "").strip() or None
 
@@ -401,13 +518,15 @@ def choose_balanced_items(
 def enrich_item(item: Dict[str, Any], idx: int) -> Dict[str, Any]:
     title = item.get("title", "")
     summary = item.get("summary", "")
-    read_time_minutes = None
-    if item.get("content_type") == "article":
-        word_count = len((title + " " + summary).split())
+    body_text = (item.get("body_text") or "").strip()
+    read_time_minutes = item.get("read_time_minutes")
+    if read_time_minutes is None and item.get("content_type") == "article":
+        source_text = body_text or f"{title} {summary}"
+        word_count = len(source_text.split())
         read_time_minutes = max(1, round(word_count / 200))
 
     now = datetime.now(timezone.utc).isoformat()
-    return {
+    enriched = {
         "id": f"content_{idx:05d}",
         "title": title,
         "url": item.get("url"),
@@ -423,19 +542,68 @@ def enrich_item(item: Dict[str, Any], idx: int) -> Dict[str, Any]:
         "seed_query": item.get("seed_query"),
         "created_at": now,
     }
+    if body_text:
+        enriched["body_text"] = body_text
+    if item.get("reader_ready"):
+        enriched["reader_ready"] = True
+    return enriched
 
 
-def collect_candidates(config: Dict[str, Any], youtube_api_key: Optional[str]) -> Dict[str, List[Dict[str, Any]]]:
+def load_existing_article_urls(db_path: Path) -> set:
+    if not db_path.exists():
+        return set()
+    con = sqlite3.connect(db_path)
+    try:
+        rows = con.execute(
+            "SELECT url FROM contents WHERE content_type = 'article'"
+        ).fetchall()
+        return {row[0] for row in rows if row[0]}
+    finally:
+        con.close()
+
+
+def collect_candidates(
+    config: Dict[str, Any],
+    youtube_api_key: Optional[str],
+    *,
+    validate_articles: bool = False,
+    scrape_fallback: bool = False,
+    scrape_delay: float = 0.25,
+    article_max_items: int = 90,
+    exclude_urls: Optional[set] = None,
+) -> Dict[str, List[Dict[str, Any]]]:
     candidates: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     clusters = config.get("clusters", [])
+
+    supplement_feeds = list(config.get("supplement_feeds") or [])
+
+    def _collect_article_feed(feed: str, cluster_id: str) -> None:
+        items = fetch_rss_or_atom_items(
+            feed,
+            cluster_id=cluster_id,
+            content_type="article",
+            max_items=article_max_items,
+            validate_articles=validate_articles,
+            scrape_fallback=scrape_fallback,
+            scrape_delay=scrape_delay,
+        )
+        if exclude_urls:
+            before = len(items)
+            items = [it for it in items if it.get("url") not in exclude_urls]
+            if validate_articles and before != len(items):
+                print(f"  [article] {feed} → {len(items)} new reader-ready ({before - len(items)} already in db)")
+            elif validate_articles:
+                print(f"  [article] {feed} → {len(items)} reader-ready")
+        elif validate_articles:
+            print(f"  [article] {feed} → {len(items)} reader-ready")
+        candidates["article"].extend(items)
 
     for cluster in clusters:
         cluster_id = cluster["id"]
         print(f"[info] collecting cluster: {cluster_id}")
 
         for feed in cluster.get("article_rss_feeds", []):
-            items = fetch_rss_or_atom_items(feed, cluster_id=cluster_id, content_type="article", max_items=90)
-            candidates["article"].extend(items)
+            _collect_article_feed(feed, cluster_id)
 
         for feed in cluster.get("podcast_rss_feeds", []):
             items = fetch_rss_or_atom_items(
@@ -465,6 +633,12 @@ def collect_candidates(config: Dict[str, Any], youtube_api_key: Optional[str]) -
                 time.sleep(0.25)
         else:
             print("[info] skipping YouTube (no YOUTUBE_API_KEY set)")
+
+    if supplement_feeds and clusters:
+        print(f"[info] collecting {len(supplement_feeds)} supplement article feeds")
+        for i, feed in enumerate(supplement_feeds):
+            cluster_id = clusters[i % len(clusters)]["id"]
+            _collect_article_feed(feed, cluster_id)
 
     return candidates
 
@@ -503,6 +677,38 @@ def main() -> None:
         default=DEFAULT_TOTAL_ITEMS,
         help="Target number of items to collect.",
     )
+    parser.add_argument(
+        "--articles-only",
+        action="store_true",
+        help="Collect articles only (no video/podcast/paper).",
+    )
+    parser.add_argument(
+        "--validate-articles",
+        action="store_true",
+        help="Keep only articles with full in-app body text.",
+    )
+    parser.add_argument(
+        "--scrape-fallback",
+        action="store_true",
+        help="When RSS has no full body, try newspaper scrape (slower).",
+    )
+    parser.add_argument(
+        "--scrape-delay",
+        type=float,
+        default=0.25,
+        help="Delay between article scrape fallbacks.",
+    )
+    parser.add_argument(
+        "--article-max-items",
+        type=int,
+        default=90,
+        help="Max RSS entries to probe per article feed.",
+    )
+    parser.add_argument(
+        "--exclude-existing-urls",
+        action="store_true",
+        help="Skip article URLs already present in noscroll.db.",
+    )
     args = parser.parse_args()
 
     script_dir = Path(__file__).resolve().parent
@@ -518,11 +724,28 @@ def main() -> None:
 
     config = load_seed_config(config_path)
     cluster_ids = [cluster["id"] for cluster in config.get("clusters", [])]
-    target_counts = compute_target_counts(args.total)
+    if args.articles_only:
+        target_counts = {"article": args.total}
+    else:
+        target_counts = compute_target_counts(args.total)
     youtube_api_key = os.getenv("YOUTUBE_API_KEY")
 
     print("[info] target distribution:", target_counts)
-    candidates_by_type = collect_candidates(config, youtube_api_key)
+    exclude_urls = None
+    if args.exclude_existing_urls:
+        db_path = script_dir / "data" / "noscroll.db"
+        exclude_urls = load_existing_article_urls(db_path)
+        print(f"[info] excluding {len(exclude_urls)} existing article URLs from db")
+
+    candidates_by_type = collect_candidates(
+        config,
+        youtube_api_key,
+        validate_articles=args.validate_articles,
+        scrape_fallback=args.scrape_fallback,
+        scrape_delay=args.scrape_delay,
+        article_max_items=args.article_max_items,
+        exclude_urls=exclude_urls,
+    )
 
     final_items: List[Dict[str, Any]] = []
     for content_type, target in target_counts.items():

@@ -1,0 +1,24 @@
+{
+  "_note": "Additional reader-friendly feeds merged at collect time.",
+  "feeds": [
+    "https://www.creativeboom.com/feed/",
+    "https://www.itsnicethat.com/rss",
+    "https://petapixel.com/feed/",
+    "https://www.booooooom.com/feed/",
+    "https://www.openculture.com/feed",
+    "https://feeds.kottke.org/main",
+    "https://www.creativebloq.com/feeds/all",
+    "https://uxdesign.cc/feed",
+    "https://reallifemag.com/feed/",
+    "https://www.theparisreview.org/feed/",
+    "https://www.3quarksdaily.com/3quarksdaily/feed/",
+    "https://www.bbc.co.uk/culture/feed.rss",
+    "https://feeds.feedburner.com/Colossal",
+    "https://www.designboom.com/feed/",
+    "https://www.archdaily.com/feed",
+    "https://www.dezeen.com/feed/",
+    "https://longform.org/feed",
+    "https://www.premiumbeat.com/blog/feed/",
+    "https://www.fastcompany.com/section/creative-conversations/rss"
+  ]
+}

@@ -3,6 +3,7 @@ const TYPE_LABELS = {
   article: "Article",
   podcast: "Podcast",
   paper: "Paper",
+  image: "Visual",
 };
 
 export default function ContentTypeTag({ type }) {
