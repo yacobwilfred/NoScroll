@@ -240,10 +240,7 @@ const NodeGraph = forwardRef(function NodeGraph({
           animate={centerAnimate}
           transition={centerTransition}
           onAnimationComplete={handleEnterComplete}
-          style={{
-            transformStyle: "preserve-3d",
-            borderRadius: 0,
-          }}
+          style={{ transformStyle: "preserve-3d" }}
         >
           <CenterContent
             node={centerNode}

@@ -43,16 +43,15 @@ export default function DirectionCorner({
         scale:   { duration: 0.3, delay: 0.2 + index * 0.06 },
         default: SPRING_CORNER,
       }}
-      style={{ borderRadius: 0, transformStyle: "preserve-3d" }}
+      style={{ transformStyle: "preserve-3d" }}
     >
       {isRelax && direction.facet_value && (
         <span className="direction-corner__facet">{direction.label}</span>
       )}
       <p className="direction-corner__title">
-        {isRelax
-          ? (preview?.format && <span className="format-tag">{preview.format}</span>)
-          : (preview && <ContentTypeTag type={preview.content_type} />)}
-        {preview?.title ?? direction.label}
+        {preview?.content_type && <ContentTypeTag type={preview.content_type} />}
+        {isRelax && preview?.format && <span className="format-tag">{preview.format}</span>}
+        <span className="direction-corner__title-text">{preview?.title ?? direction.label}</span>
       </p>
       {cl !== null && (
         <span className={`direction-corner__cl direction-corner__cl--${focusCostTier(cl)} ${isRelax ? "direction-corner__cl--relax" : ""}`}>
